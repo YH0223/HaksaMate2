@@ -87,7 +87,7 @@ export const ApiKeyErrorDisplay = React.memo(({ isDarkMode, sdkError, apiKeyErro
                 isDarkMode ? "text-green-200 bg-green-900/30" : "text-green-700 bg-green-100"
               } px-2 py-1 rounded`}
             >
-              ca91a71f77581356c6aca311412bebc1
+              ca91a71f77581356c6aca31412bebc1d
             </code>
             <p className={`mt-1 text-xs ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
               (32자리, 16진수만 포함)

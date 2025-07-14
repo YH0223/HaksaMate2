@@ -1,4 +1,5 @@
 import React from "react"
+import { useGlobalProfile } from '@/components/GlobalProfileProvider'
 
 interface CommentFormProps {
   value: string
@@ -13,6 +14,7 @@ export const CommentForm: React.FC<CommentFormProps> = ({
   onSubmit,
   username,
 }) => {
+  const { profile } = useGlobalProfile()
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       onSubmit()
@@ -21,11 +23,21 @@ export const CommentForm: React.FC<CommentFormProps> = ({
 
   return (
     <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl">
-      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-        <span className="text-white font-semibold text-xs">
-          {username[0]?.toUpperCase()}
-        </span>
-      </div>
+      {profile.profileImage ? (
+        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <img 
+            src={profile.profileImage} 
+            alt={profile.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : (
+        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <span className="text-white font-semibold text-xs">
+            {(profile.name || username)[0]?.toUpperCase()}
+          </span>
+        </div>
+      )}
       <div className="flex-1 flex items-center gap-2">
         <input
           className="flex-1 px-4 py-2 text-sm rounded-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"

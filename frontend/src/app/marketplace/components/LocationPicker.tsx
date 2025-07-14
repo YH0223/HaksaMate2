@@ -396,7 +396,7 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
                     >
                       <div className="flex items-center">
                         <MdLocationOn className="text-orange-500 mr-2" size={20} />
-                        <span className="flex-1 text-sm">{selectedLocation.address}</span>
+                        <span className="flex-1 text-sm">{selectedLocation.address }</span>
                       </div>
                     </div>
                   )}

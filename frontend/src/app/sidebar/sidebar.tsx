@@ -27,6 +27,8 @@ import {
 
 import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { useAuth } from "@/hooks/useAuth"
+import { fetchProfile } from "@/lib/profile"
 
 interface SidebarProps {
   sidebarOpen: boolean
@@ -44,12 +46,31 @@ interface MenuItem {
 export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const { user } = useAuth()
   const [mounted, setMounted] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [userProfile, setUserProfile] = useState({
+    name: "My Account",
+    profileImage: null as string | null
+  })
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // 사용자 프로필 정보 가져오기
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfile(user.id).then(data => {
+        setUserProfile({
+          name: data.name || "My Account",
+          profileImage: data.profile_image_url || null
+        })
+      }).catch(error => {
+        console.error('프로필 정보 가져오기 실패:', error)
+      })
+    }
+  }, [user])
 
   // 키보드 단축키 지원
   useEffect(() => {
@@ -74,7 +95,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       { label: "시간표", icon: <Calendar size={20} />, path: "/", category: "main" },
       { label: "타이머", icon: <Clock size={20} />, path: "/timer", category: "main" },
       { label: "성적 관리", icon: <GraduationCap size={20} />, path: "/grades", category: "main" },
-      { label: "친구찾기", icon: <Heart size={20} />, path: "/matching", category: "main" },
+      { label: "매칭하기", icon: <Heart size={20} />, path: "/matching", category: "main" },
       { label: "중고마켓", icon: <ShoppingBag size={20} />, path: "/marketplace", badge: "NEW", category: "main" }, // 중고마켓 메뉴 추가
       { label: "시험 일정", icon: <BookOpen size={20} />, path: "/exams", category: "main" },
       { label: "출석 관리", icon: <UserCheck size={20} />, path: "/attendance", category: "main" },
@@ -182,11 +203,19 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
               onClick={() => setUserMenuOpen(!userMenuOpen)}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20 overflow-hidden">
+                  {userProfile.profileImage ? (
+                    <img 
+                      src={userProfile.profileImage} 
+                      alt="프로필 사진" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
                   <span className="text-white font-semibold text-sm">학</span>
+                  )}
                 </div>
                 <div className="flex-1">
-                  <div className="text-gray-900 font-medium text-sm">My Account</div>
+                  <div className="text-gray-900 font-medium text-sm">{userProfile.name}</div>
                   <div className="text-gray-500 text-xs">학생</div>
                 </div>
                 <ChevronDown
@@ -198,7 +227,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
               {/* 사용자 메뉴 */}
               {userMenuOpen && (
                 <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
-                  <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-white/60 transition-all duration-200">
+                  <button 
+                    onClick={() => {
+                      handleNavigation('/settings')
+                      setUserMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-white/60 transition-all duration-200"
+                  >
                     <User size={16} />
                     <span className="text-sm font-medium">프로필 설정</span>
                   </button>

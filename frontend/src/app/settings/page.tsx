@@ -30,7 +30,6 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("profile")
   const [saving, setSaving] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [showProfileModal, setShowProfileModal] = useState(false)
   const [profileImage, setProfileImage] = useState<string | undefined>(undefined)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -157,6 +156,8 @@ export default function SettingsPage() {
         profile_image_url: profileImage,
       })
       alert("설정이 저장되었습니다.")
+      // 페이지 새로고침으로 사이드바 업데이트
+      window.location.reload()
     } catch (e) {
       alert("설정 저장에 실패했습니다.")
     }
@@ -219,6 +220,22 @@ export default function SettingsPage() {
 
       // 성공 시 이미지 경로 설정
       setProfileImage(`/profile_img/${fileName}`)
+      
+      // 이미지 업로드 후 즉시 저장
+      if (user) {
+        try {
+          await updateProfile(user.id, {
+            name: profileSettings.name,
+            email: profileSettings.email,
+            department: profileSettings.department,
+            studentId: profileSettings.studentId,
+            year: profileSettings.year,
+            profile_image_url: `/profile_img/${fileName}`,
+          })
+        } catch (e) {
+          console.error('프로필 이미지 저장 실패:', e)
+        }
+      }
 
     } catch (error) {
       console.error('이미지 업로드 오류:', error)
@@ -253,6 +270,22 @@ export default function SettingsPage() {
     setProfileImage(undefined)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+
+    // DB에서 프로필 이미지 URL 제거
+    if (user) {
+      try {
+        await updateProfile(user.id, {
+          name: profileSettings.name,
+          email: profileSettings.email,
+          department: profileSettings.department,
+          studentId: profileSettings.studentId,
+          year: profileSettings.year,
+          profile_image_url: undefined,
+        })
+      } catch (e) {
+        console.error('프로필 이미지 제거 실패:', e)
+      }
     }
   }
 

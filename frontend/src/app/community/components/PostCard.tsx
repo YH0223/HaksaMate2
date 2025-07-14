@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { Comment, Post } from "../types"
 import { CommentSection } from "./CommentSection"
+import { useGlobalProfile } from '@/components/GlobalProfileProvider'
 
 interface PostCardProps {
   post: Post
@@ -26,6 +27,7 @@ interface PostCardProps {
   onDelete: () => void
   onAddComment: () => void
   onDeleteComment: (commentId: number) => void
+  onProfileClick?: (sellerId: string) => void // 👈 추가
 }
 
 export const PostCard: React.FC<PostCardProps> = ({
@@ -44,23 +46,46 @@ export const PostCard: React.FC<PostCardProps> = ({
   onDelete,
   onAddComment,
   onDeleteComment,
+  onProfileClick
 }) => {
+  const { profile } = useGlobalProfile()
+  const isOwner = post.author_id===user.id
   return (
     <article className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200/50 dark:border-slate-700/50 p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group">
       {/* Post Header */}
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-start gap-4">
-          <div className="relative flex-shrink-0">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-              <span className="text-white font-bold text-lg">
-                {post.author_username[0]?.toUpperCase()}
-              </span>
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
+        <div className="relative flex-shrink-0">
+        <div
+            className={`w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-blue-500/25 ${
+              !isOwner ? "cursor-pointer" : ""
+            }`}
+            onClick={() => {
+              if (!isOwner && onProfileClick) {
+                onProfileClick(post.author_id)
+              }
+            }}
+          >
+            {user && user.id === post.author_id && profile.profileImage ? (
+              <img
+                src={profile.profileImage}
+                alt={profile.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">
+                  {post.author_username[0]?.toUpperCase()}
+                </span>
+              </div>
+            )}
           </div>
+          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
+        </div>
+
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-slate-800 dark:text-slate-200 text-base sm:text-lg truncate">
-              {post.author_username}
+              {user && user.id === post.author_id ? (profile.name || post.author_username) : post.author_username}
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <span>{new Date(post.created_at).toLocaleString("ko-KR")}</span>

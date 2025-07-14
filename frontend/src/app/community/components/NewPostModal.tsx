@@ -1,5 +1,6 @@
 import React from "react"
 import { ImageIcon, Smile, X } from "lucide-react"
+import { useGlobalProfile } from '@/components/GlobalProfileProvider'
 
 interface NewPostModalProps {
   onClose: () => void
@@ -18,6 +19,7 @@ export const NewPostModal: React.FC<NewPostModalProps> = ({
   isCreatingPost,
   handleCreatePost,
 }) => {
+  const { profile } = useGlobalProfile()
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -35,14 +37,24 @@ export const NewPostModal: React.FC<NewPostModalProps> = ({
 
         <div className="p-6">
           <div className="flex items-start gap-4 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-semibold text-sm">
-                {username[0]?.toUpperCase()}
-              </span>
-            </div>
+            {profile.profileImage ? (
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <img 
+                  src={profile.profileImage} 
+                  alt={profile.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-semibold text-sm">
+                  {profile.name[0]?.toUpperCase() || username[0]?.toUpperCase()}
+                </span>
+              </div>
+            )}
             <div className="flex-1">
               <h3 className="font-medium text-slate-900 dark:text-slate-100 mb-1">
-                {username}
+                {profile.name || username}
               </h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 공개 게시

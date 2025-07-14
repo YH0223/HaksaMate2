@@ -43,6 +43,10 @@ import { NewPostModal } from "./components/NewPostModal"
 import { NotificationsPanel } from "./components/NotificationsPanel"
 import { MockDataFactory, type MockUser } from '@/lib/mockData'
 import { StatusIndicator } from '@/components/ui/StatusIndicator'
+import { useGlobalProfile } from '@/components/GlobalProfileProvider'
+import ChatModal from "@/components/ChatModal"
+import { OtherProfileModal } from "../components/OthersProfileModal"
+import {useAuth} from "@/hooks/useAuth"
 
 // User 타입을 Supabase User와 호환되도록 수정
 interface CommunityUser {
@@ -53,14 +57,14 @@ interface CommunityUser {
 
 export default function CommunityPage() {
   const router = useRouter()
+  const { profile } = useGlobalProfile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"all" | "popular" | "following">(
     "all",
   )
   const [newPost, setNewPost] = useState("")
   const [posts, setPosts] = useState<Post[]>([])
-  const [user, setUser] = useState<CommunityUser | null>(null)
-  const [username, setUsername] = useState<string>("")
+  
   const [likedPostIds, setLikedPostIds] = useState<number[]>([])
   const [bookmarkedPostIds, setBookmarkedPostIds] = useState<number[]>([])
   const [comments, setComments] = useState<Record<number, Comment[]>>({})
@@ -78,7 +82,7 @@ export default function CommunityPage() {
   const [isPullRefreshing, setIsPullRefreshing] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [startY, setStartY] = useState(0)
-
+  const { user, isLoading:isAuthLoading } = useAuth()
   const [
     notifications,
     setNotifications,
@@ -93,7 +97,23 @@ export default function CommunityPage() {
   >([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [showOtherProfile, setShowOtherProfile] = useState(false)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
+  const [showChatModal, setShowChatModal] = useState(false)
+  const [chatTargetId, setChatTargetId] = useState<string | null>(null)
+
+  const handleProfileClick = (userId: string) => {
+    if (!user || userId === user.id) return // 내 프로필이면 무시
+    setSelectedUserId(userId)
+    setShowOtherProfile(true)
+  }
+  
+  const handleOpenChat = (targetUserId: string) => {
+    setChatTargetId(targetUserId)
+    setShowChatModal(true)
+  }
+  
   // 알림 패널 외부 클릭 감지
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -110,7 +130,13 @@ export default function CommunityPage() {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [showNotifications])
-
+  
+  useEffect(() => {
+    if (user?.id) {
+      loadPosts()
+    }
+  }, [user?.id])
+  
   // 알림 추가 함수
   const addNotification = useCallback(
     (type: "like" | "comment" | "new_post", message: string) => {
@@ -210,46 +236,7 @@ export default function CommunityPage() {
     }))
   }, [])
 
-  // 인증 확인 - 타입 문제 해결
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        if (!session) {
-          router.push("/auth/login")
-          return
-        }
-        
-        // Supabase User를 CommunityUser로 변환
-        setUser({
-          id: session.user.id,
-          email: session.user.email
-        })
 
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("nickname")
-          .eq("id", session.user.id)
-          .single()
-
-        if (!error && data) {
-          setUsername(data.nickname)
-        } else {
-          setUsername(session.user.email?.split("@")[0] || "사용자")
-        }
-
-        const liked = await fetchUserLikedPostIds(session.user.id)
-        setLikedPostIds(liked)
-      } catch (error) {
-        console.error("Auth check failed:", error)
-      }
-    }
-
-    checkAuth()
-    loadPosts()
-  }, [router])
 
   // 게시글 로드
   const loadPosts = useCallback(
@@ -396,7 +383,7 @@ export default function CommunityPage() {
     try {
       await createPost({
         author_id: user.id,
-        author_username: username,
+        author_username: profile.name || "사용자",
         content: newPost.trim(),
         tags: [],
       })
@@ -409,7 +396,7 @@ export default function CommunityPage() {
     } finally {
       setIsCreatingPost(false)
     }
-  }, [newPost, user, username, isCreatingPost, loadPosts])
+  }, [newPost, user, profile.name, isCreatingPost, loadPosts])
 
   // 게시글 삭제
   const handleDeletePost = useCallback(
@@ -468,7 +455,7 @@ export default function CommunityPage() {
         await createComment({
           post_id: postId,
           author_id: user.id,
-          author_username: username,
+          author_username: profile.name || "사용자",
           content,
         })
         setNewComment(prev => ({ ...prev, [postId]: "" }))
@@ -481,7 +468,7 @@ export default function CommunityPage() {
         alert("댓글 등록에 실패했습니다.")
       }
     },
-    [user, username, newComment, loadPosts],
+    [user, profile.name, newComment, loadPosts],
   )
 
   // 댓글 삭제
@@ -561,7 +548,7 @@ export default function CommunityPage() {
           {/* Pull-to-Refresh 인디케이터 */}
           <div
             className="md:hidden fixed top-0 left-0 right-0 z-50 flex justify-center transition-transform duration-300 ease-out"
-            style={{
+            style={{ 
               transform: `translateY(${pullDistance - 60}px)`,
               opacity: pullDistance > 20 ? 1 : 0,
             }}
@@ -692,7 +679,7 @@ export default function CommunityPage() {
 
               {/* 게시글 목록 - 개선된 스켈레톤 로딩 */}
               <div className="space-y-6">
-                {isLoading ? (
+                {isAuthLoading ? (
                   // 스켈레톤 로딩 UI
                   <div className="space-y-6">
                     {[...Array(3)].map((_, index) => (
@@ -767,7 +754,7 @@ export default function CommunityPage() {
                       key={post.id}
                       post={post}
                       user={user}
-                      username={username}
+                      username={profile.name || "사용자"}
                       isLiked={likedPostIds.includes(post.id)}
                       isBookmarked={bookmarkedPostIds.includes(post.id)}
                       areCommentsVisible={!!showComments[post.id]}
@@ -784,6 +771,7 @@ export default function CommunityPage() {
                       onDeleteComment={commentId =>
                         handleDeleteComment(commentId, post.id)
                       }
+                      onProfileClick={handleProfileClick}
                     />
                   ))
                 )}
@@ -822,7 +810,7 @@ export default function CommunityPage() {
         {user && (
           <button
             onClick={() => setShowNewPostModal(true)}
-            className="md:hidden fixed bottom-4 sm:bottom-6 right-4 sm:right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-2xl shadow-lg shadow-blue-600/25 transition-all duration-200 hover:scale-105 active:scale-95 z-50 flex items-center justify-center"
+            className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-2xl shadow-lg shadow-blue-600/25 transition-all duration-200 hover:scale-105 active:scale-95 z-50 flex items-center justify-center"
           >
             <Plus className="w-6 h-6" />
           </button>
@@ -835,13 +823,38 @@ export default function CommunityPage() {
               setShowNewPostModal(false)
               setNewPost("")
             }}
-            username={username}
+            username={profile.name || "사용자"}
             newPost={newPost}
             setNewPost={setNewPost}
             isCreatingPost={isCreatingPost}
             handleCreatePost={handleCreatePostWithModalClose}
           />
         )}
+
+      {showOtherProfile && selectedUserId && (
+        <OtherProfileModal
+          showProfileModal={showOtherProfile}
+          targetUserId={selectedUserId}
+          onClose={() => setShowOtherProfile(false)}
+          onStartChat={() => {
+            setChatTargetId(selectedUserId)
+            setShowOtherProfile(false)
+            setShowChatModal(true)
+          }}
+        />
+      )}
+
+      {showChatModal && chatTargetId && (
+        <ChatModal
+          isOpen={showChatModal}
+          sellerId={chatTargetId}
+          onClose={() => {
+            setShowChatModal(false)
+            setChatTargetId(null)
+          }}
+          isDarkMode={false} // 혹은 isDarkMode 상태가 있다면 반영
+        />
+      )}
       </div>
     </div>
   )

@@ -32,9 +32,15 @@ export const useTimetable = (userId: string | null) => {
         .eq('user_id', uid)
         .order('version', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (error) throw error
+
+      if (!data) {
+        console.warn('📥 시간표 없음: 새로 생성 필요')
+        setTimetable([])
+        return
+      }
 
       const slots: TimetableSlot[] = data?.data?.slots ?? []
       setTimetable(slots)

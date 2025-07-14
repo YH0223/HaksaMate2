@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import type { Product, CreateProductRequest, UpdateProductRequest, SearchFilters } from "../types"
-import {useChat,useChatRooms}from "@/hooks/useChat"
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 export const useMarketplace = () => {

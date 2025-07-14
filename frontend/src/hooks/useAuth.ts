@@ -117,7 +117,7 @@ export const useAuth = () => {
         // 프로필 조회는 백그라운드에서 진행
         try {
           const { data: profile } = await supabase.from("profiles").select("name").eq("id", session.user.id).single()
-
+          
           if (profile?.name) {
             setUser({
               id: session.user.id,

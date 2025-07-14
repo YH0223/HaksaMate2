@@ -6,7 +6,7 @@ import type { Profile } from "../types"
 
 export const useLikedProfiles = (currentUserId?: string) => {
   const [likedProfiles, setLikedProfiles] = useState<Profile[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLikedLoading, setIsLoading] = useState(false)
 
   const loadLikedProfiles = useCallback(async () => {
     if (!currentUserId) {
@@ -162,7 +162,7 @@ export const useLikedProfiles = (currentUserId?: string) => {
 
   return {
     likedProfiles,
-    isLoading,
+    isLikedLoading,
     loadLikedProfiles,
     unlikeProfile,
     checkMutualLikes,

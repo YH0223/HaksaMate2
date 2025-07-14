@@ -19,6 +19,8 @@ import ReportModal from "./components/ReportModal"
 import { useTransactions } from "./hooks/useTransactions"
 import {useReports} from "./hooks/useReports"
 import { useKakaoMap } from "@/hooks/useKakaoMap"
+import { ProfileModal } from "../components/ProfileModal"
+import { OtherProfileModal } from "../components/OthersProfileModal"
 
 const MarketplacePage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -56,7 +58,21 @@ const MarketplacePage: React.FC = () => {
   const { createTransaction } = useTransactions()
   const kakaoMapState = useKakaoMap()
 
-  
+  const [profileModalUserId, setProfileModalUserId] = useState<string | null>(null)
+
+  const handleProfileClick = (sellerId: string) => {
+    // 본인이면 모달 띄우지 않음
+    if (sellerId === user?.id) return
+    setProfileModalUserId(sellerId)
+  }
+
+  const handleStartChatFromProfile = (sellerId: string) => {
+  // ChatModal은 OtherProfileModal 닫힌 뒤 띄움
+  setTimeout(() => {
+    setChatSellerId(sellerId)
+    setShowChat(true)
+  }, 300) // react-modal transition 시간 고려해서 약간 딜레이
+}
   // 초기 상품 로드
   useEffect(() => {
     console.log("🧑 현재 사용자 ID:", user?.id)
@@ -259,7 +275,7 @@ const MarketplacePage: React.FC = () => {
     setEditingProduct(null)
     setSelectedProduct(null)
   }, [selectedCategory, loadProducts])
-
+  
   return (
     <>
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
@@ -273,8 +289,16 @@ const MarketplacePage: React.FC = () => {
       >
         <AnimatedBackground isDarkMode={isDarkMode} />
 
-        <Header isDarkMode={isDarkMode} onToggleTheme={toggleTheme} onAddProduct={handleAddProduct} />
-
+        <Header
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          onAddProduct={handleAddProduct}
+          onOpenChat={() => {
+            setShowChat(true)
+            setChatSellerId(user?.id??null) // seller 지정 없이 열기
+          }}
+        />
+      
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-8 pb-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* 사이드바 (데스크톱) */}
@@ -360,6 +384,7 @@ const MarketplacePage: React.FC = () => {
                           onReport={handleReport}
                           currentUserId={user?.id}
                           isDarkMode={isDarkMode}
+                          onProfileClick={handleProfileClick}
                         />
                       </div>
                     ))}
@@ -426,7 +451,7 @@ const MarketplacePage: React.FC = () => {
         />
       )}
 
-      {showChat && (
+      {showChat &&  (
         <ChatModal
           isOpen={showChat}
           onClose={() => {
@@ -455,7 +480,17 @@ const MarketplacePage: React.FC = () => {
         />
       )}
 
-      <style jsx>{`
+      {profileModalUserId && (
+        <OtherProfileModal
+          showProfileModal={!!profileModalUserId}
+          targetUserId={profileModalUserId}
+          onClose={() => setProfileModalUserId(null)}
+          isDarkMode={isDarkMode}
+          onStartChat={handleStartChatFromProfile}
+        />
+      )}
+
+      <style jsx>{ `
         @keyframes slideInUp {
           from {
             opacity: 0;

@@ -6,6 +6,9 @@ import { X, Send, Smile, User, MessageCircle, Search } from "lucide-react"
 import { useChat, useChatRooms } from "../hooks/useChat"
 import { supabase } from "@/lib/supabaseClient"
 
+import { StatusIndicator } from '@/components/ui/StatusIndicator'
+import {useGlobalProfile } from "./GlobalProfileProvider"
+
 interface ChatModalProps {
   isOpen: boolean
   onClose: () => void
@@ -47,7 +50,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
   const [newMessage, setNewMessage] = useState("")
   const [isMobile, setIsMobile] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
+  const { profile } = useGlobalProfile()
   // 유저 정보 조회 (Supabase 사용)
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -223,7 +226,17 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
                   <span className="ml-2 text-sm font-normal opacity-60">({selectedRoom.chatroomId}번 방)</span>
                   {/* 🔧 연결 상태 표시 추가 */}
                   <div className="flex items-center gap-2 ml-3">
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`} />
+                    
+                  <StatusIndicator 
+
+                      status="online" 
+
+                      size="sm" 
+
+                      animate 
+
+                      />
+                    
                     <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                       {isConnected ? "연결됨" : "연결 안됨"}
                     </span>
@@ -312,19 +325,26 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
                         {/* Avatar */}
                         <div className="relative">
                           <div
-                            className={`w-12 h-12 rounded-full p-0.5 ${
+                            className={`w-12 h-12 rounded-full p-0.5 overflow-hidden p-0.5 ${
                               isDarkMode
                                 ? "bg-gradient-to-br from-gray-600 to-gray-500"
                                 : "bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500"
                             }`}
                           >
-                            <div
-                              className={`w-full h-full rounded-full flex items-center justify-center ${
-                                isDarkMode ? "bg-gray-800" : "bg-white"
-                              }`}
-                            >
-                              <User size={18} className={isDarkMode ? "text-gray-300" : "text-gray-600"} />
-                            </div>
+                            {profile.profileImage ? (
+                                    <img
+                                      src={profile.profileImage}
+                                      alt="프로필 사진"
+                                      className="w-full h-full object-cover"
+                                    />
+                                    ) : (
+                                    <div
+                                      className={`w-full h-full rounded-full flex items-center justify-center ${
+                                        isDarkMode ? "bg-gray-800" : "bg-white"
+                                      }`}>
+                                      <User size={18} className={isDarkMode ? "text-gray-300" : "text-gray-600"} />
+                                    </div>
+                                    )}
                           </div>
                         </div>
 

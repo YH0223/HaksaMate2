@@ -1,8 +1,9 @@
 "use client"
 
 import React, { useState,useEffect} from "react"
-import { Heart, Eye, MapPin, Clock, MessageCircle, Star, MoreVertical, Edit, Trash2, CheckCircle } from "lucide-react"
+import { Heart, Eye, MapPin, Clock, MessageCircle, Star, MoreVertical, Edit, Trash2, CheckCircle,UserIcon} from "lucide-react"
 import type { Product } from "../types"
+import {fetchProfile} from "@/lib/profile"
 
 interface ProductCardProps {
   product: Product
@@ -16,6 +17,7 @@ interface ProductCardProps {
   onStatusChange?: (productId: number, status: "판매중" | "예약중" | "거래완료") => void
   currentUserId?: string
   isDarkMode?: boolean
+  onProfileClick: (sellerId: string) => void
 }
 
 const ProductCard = React.memo(
@@ -30,14 +32,24 @@ const ProductCard = React.memo(
     onStatusChange,
     currentUserId,
     isDarkMode = false,
+    onProfileClick
   }: ProductCardProps) => {
     const [imageLoaded, setImageLoaded] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
     const [showMenu, setShowMenu] = useState(false)
+    const [showOtherProfile,setShowOtherProfile] =useState(false)
 
     const formatPrice = (price: number) => {
       return new Intl.NumberFormat("ko-KR").format(price) + "원"
     }
+    const [sellerProfile, setSellerProfile] = useState<{ profile_image_url?: string } | null>(null)
+    useEffect(() => {
+      if (!product?.sellerId) return
+      fetchProfile(product.sellerId)
+        .then((data) => setSellerProfile(data))
+        .catch((err) => console.error("판매자 프로필 조회 실패:", err))
+    }, [product?.sellerId])
+
 
     const formatTimeAgo = (timestamp: number) => {
       const now = Date.now();
@@ -369,32 +381,52 @@ const ProductCard = React.memo(
           </div>
 
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  isDarkMode
-                    ? "bg-gradient-to-br from-blue-400 to-blue-600"
-                    : "bg-gradient-to-br from-blue-500 to-blue-700"
-                } shadow-lg`}
-              >
-
-              </div>
-              <div>
-                <span className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
-                  {product.sellerName}
-                  {isOwner && (
-                    <span
-                      className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                        isDarkMode ? "bg-blue-500/20 text-blue-300" : "bg-blue-100 text-blue-600"
-                      }`}
-                    >
-                      내 상품
-                    </span>
-                  )}
-                </span>
-              </div>
+          <div
+            className="flex items-center gap-3"
+            {...(!isOwner && onProfileClick
+              ? {
+                  onClick: (e: React.MouseEvent) => {
+                    e.stopPropagation() // 💥 이벤트 버블링 방지
+                    onProfileClick(product.sellerId)
+                  },
+                  className: "cursor-pointer flex items-center gap-3",
+                }
+              : {})}
+  >
+            <div
+              className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${
+                isDarkMode
+                  ? "bg-gradient-to-br from-blue-400 to-blue-600"
+                  : "bg-gradient-to-br from-blue-500 to-blue-700"
+              } shadow-lg`}
+            >
+              {sellerProfile?.profile_image_url ? (
+                <img
+                  src={sellerProfile.profile_image_url}
+                  alt="판매자 프로필"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <UserIcon className="text-white w-5 h-5" />
+              )}
+            </div>
+            <div>
+              <span className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                {product.sellerName}
+                {isOwner && (
+                  <span
+                    className={`ml-2 text-xs px-2 py-1 rounded-full ${
+                      isDarkMode ? "bg-blue-500/20 text-blue-300" : "bg-blue-100 text-blue-600"
+                    }`}
+                  >
+                    내 상품
+                  </span>
+                )}
+              </span>
             </div>
           </div>
+        </div>
+
 
           {/* 🔧 채팅 버튼 - 자신의 상품이면 숨김 */}
           {!isOwner && (
