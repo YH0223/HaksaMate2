@@ -9,6 +9,7 @@ import { useSubjects, type Subject } from "@/hooks/useSubjects"
 import { useTimetable } from "@/hooks/useTimetable"
 import { showToast, ToastContainer } from "./components/toast"
 import { BookOpen, Plus } from "lucide-react"
+import { fetchExams, fetchChecklist, type Exam, type ChecklistItem } from "@/lib/examApi"
 
 // Components
 import Sidebar from "./sidebar/sidebar"
@@ -66,6 +67,75 @@ export default function Page() {
 
   const { subjects, isLoading, addSubject, updateSubject, deleteSubject } = useSubjects(user?.id || null)
   const { timetable, isLoading: isTimetableLoading, saveTimetable, loadTimetable } = useTimetable(user?.id)
+
+  // D-Day 연동용 시험 데이터 state 추가
+  const [examTasks, setExamTasks] = useState<{
+    id: string
+    title: string
+    subject: string
+    dueDate: string
+  }[]>([])
+
+  // 체크리스트 데이터 state 추가
+  const [checklistItems, setChecklistItems] = useState<{
+    id: string
+    text: string
+    done: boolean
+    examId: number
+    examSubject: string
+  }[]>([])
+
+  // 시험 데이터와 체크리스트 불러오기
+  useEffect(() => {
+    const loadExamsAndChecklist = async () => {
+      if (!user?.id) return
+      try {
+        const exams: Exam[] = await fetchExams(user.id)
+        // DashboardPanel Task 타입에 맞게 변환
+        setExamTasks(
+          exams.map((exam) => ({
+            id: String(exam.id),
+            title: exam.subject + " (" + exam.type + ")",
+            subject: exam.subject,
+            dueDate: exam.date,
+          }))
+        )
+
+        // 모든 시험의 체크리스트 불러오기
+        const allChecklistItems: {
+          id: string
+          text: string
+          done: boolean
+          examId: number
+          examSubject: string
+        }[] = []
+
+        for (const exam of exams) {
+          if (exam.id) {
+            try {
+              const checklist = await fetchChecklist(user.id, exam.id)
+              checklist.forEach((item) => {
+                allChecklistItems.push({
+                  id: String(item.id),
+                  text: `[${exam.subject}] ${item.task}`,
+                  done: item.completed,
+                  examId: exam.id!,
+                  examSubject: exam.subject,
+                })
+              })
+            } catch (e) {
+              // 개별 체크리스트 로드 실패는 무시
+            }
+          }
+        }
+
+        setChecklistItems(allChecklistItems)
+      } catch (e) {
+        // 에러 무시(로그인 전 등)
+      }
+    }
+    loadExamsAndChecklist()
+  }, [user?.id])
 
   const timeOptions = useMemo(
     () =>
@@ -514,7 +584,8 @@ export default function Page() {
               {/* 대시보드 */}
               <DashboardPanel
                 subjects={subjects}
-                // TODO: 실제 과제 데이터를 전달할 수 있도록 hooks 연동 예정
+                tasks={examTasks}
+                checklistItems={checklistItems}
               />
             </div>
           </div>

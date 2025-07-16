@@ -1,5 +1,6 @@
 package com.mega.haksamate.service;
 
+import com.mega.haksamate.dto.SearchHistoryResponseDTO;
 import com.mega.haksamate.entity.History;
 import com.mega.haksamate.entity.Profile;
 
@@ -33,11 +34,11 @@ public class SearchService {
     }
 
     @Transactional(readOnly = true)
-    public List<String> getSearchHistory(UUID userId) {
+    public List<SearchHistoryResponseDTO> getSearchHistory(UUID userId) {
         Profile user = profileRepository.findById(userId).orElseThrow();
         return searchHistoryRepository.findAllByProfileOrderBySearchAtDesc(user)
                 .stream()
-                .map(History::getKeyword)
+                .map(history -> new SearchHistoryResponseDTO(history.getId(), history.getKeyword()))
                 .collect(Collectors.toList());
     }
 

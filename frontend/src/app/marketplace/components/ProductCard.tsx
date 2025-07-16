@@ -18,6 +18,7 @@ interface ProductCardProps {
   currentUserId?: string
   isDarkMode?: boolean
   onProfileClick: (sellerId: string) => void
+  onOpenChat: (profileId:string)=>void
 }
 
 const ProductCard = React.memo(
@@ -69,11 +70,11 @@ const ProductCard = React.memo(
 
     const getStatusColor = (status: string) => {
       switch (status) {
-        case "available":
+        case "판매중":
           return "bg-green-500"
-        case "reserved":
+        case "예약중":
           return "bg-yellow-500"
-        case "sold":
+        case "거래완료":
           return "bg-gray-500"
         default:
           return "bg-green-500"
@@ -82,14 +83,14 @@ const ProductCard = React.memo(
 
     const getStatusLabel = (status: string) => {
       switch (status) {
-        case "available":
+        case "판매중":
           return "판매중"
-        case "reserved":
+        case "예약중":
           return "예약중"
-        case "sold":
+        case "거래완료":
           return "거래완료"
         default:
-          return "판매중"
+          return "거래완료"
       }
     }
 

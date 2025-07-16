@@ -39,16 +39,20 @@ const ReviewListModal: React.FC<ReviewListModalProps> = ({
   const loadReviews = async () => {
     setIsLoading(true)
     try {
-      const [reviewsData, summaryData] = await Promise.all([onGetReviews(sellerId), onGetReviewSummary(sellerId)])
+      const reviewsData = await onGetReviews(sellerId)
+  
+      const total = reviewsData.length
+      const sum = reviewsData.reduce((acc, cur) => acc + cur.rating, 0)
+      const average = total > 0 ? sum / total : 0
+  
       setReviews(reviewsData)
-      setSummary(summaryData)
+      setSummary({ averageRating: average, totalReviews: total })
     } catch (error) {
       console.error("리뷰 로딩 실패:", error)
     } finally {
       setIsLoading(false)
     }
   }
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("ko-KR")
   }

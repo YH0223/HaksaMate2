@@ -8,5 +8,4 @@ export const ANIMATION_DURATION = 600
 export const SEGMENTS: SegmentItem[] = [
   { id: "matching", label: "매칭", icon: Heart },
   { id: "nearby", label: "근처", icon: MapPin },
-  { id: "liked", label: "좋아요", icon: Star },
 ]

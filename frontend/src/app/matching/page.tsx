@@ -21,7 +21,7 @@ import { useMatchingLogic } from "./hooks/useMatchingLogic"
 import { useDragHandlers } from "./hooks/useDragHandlers"
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts"
 import { useChatRooms } from "@/hooks/useChat"
-
+import { OtherProfileModal } from "../components/OthersProfileModal"
 // Constants
 import { ANIMATION_DURATION } from "./constants"
 
@@ -105,6 +105,8 @@ const MatchingPage: React.FC = () => {
   // 좋아요한 프로필에서 채팅 시작
   const handleOpenChatFromLiked = useCallback(
     async (profileId: string) => {
+      console.log("💬 handleOpenChatFromLiked 호출됨. profileId:", profileId, "user:", user?.id);
+      
       if (!user?.id) {
         console.error("❌ 사용자 정보가 없음")
         return
@@ -283,7 +285,7 @@ const MatchingPage: React.FC = () => {
         />
 
         {/* Chat Modal - 실제 채팅방 ID와 함께 */}
-        {chatModalOpen && selectedChatRoomId && (
+        {chatModalOpen && (
           <ChatModal
             isOpen={chatModalOpen}
             onClose={handleCloseChatModalExtended}
@@ -291,6 +293,7 @@ const MatchingPage: React.FC = () => {
             isDarkMode={isDarkMode}
           />
         )}
+
       </div>
     </>
   )

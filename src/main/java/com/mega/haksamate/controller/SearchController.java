@@ -1,5 +1,6 @@
 package com.mega.haksamate.controller;
 
+import com.mega.haksamate.dto.SearchHistoryResponseDTO;
 import com.mega.haksamate.dto.SearchKeywordRequestDTO;
 import com.mega.haksamate.service.SearchService;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,7 @@ public class SearchController {
     }
 
     @GetMapping
-    public ResponseEntity<List<String>> getSearchHistory(@RequestParam UUID userId) {
+    public ResponseEntity<List<SearchHistoryResponseDTO>> getSearchHistory(@RequestParam UUID userId) {
         return ResponseEntity.ok(searchService.getSearchHistory(userId));
     }
 

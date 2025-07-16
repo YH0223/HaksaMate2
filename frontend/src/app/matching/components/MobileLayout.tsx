@@ -1,10 +1,12 @@
 "use client"
 
-import React, { useCallback } from "react"
+import React, { useCallback, useState } from "react"
 import SegmentControl from "./SegmentControl"
 import MatchingContent from "./MatchingContent"
 import NearbyMatching from "./NearbyMatching"
 import LikedProfiles from "./LikedProfiles"
+import { MobileFAB } from "@/app/components/mobile-fab"
+import Modal from "react-modal"
 import type { SegmentType, Profile } from "../types"
 
 interface MobileLayoutProps {
@@ -48,6 +50,8 @@ const MobileLayout = React.memo(
     onLike,
     onDislike,
   }: MobileLayoutProps) => {
+    const [showLikedModal, setShowLikedModal] = useState(false)
+
     const renderContent = useCallback(() => {
       switch (activeSegment) {
         case "matching":
@@ -70,9 +74,10 @@ const MobileLayout = React.memo(
             />
           )
         case "nearby":
-          return <NearbyMatching isDarkMode={isDarkMode} />
-        case "liked":
-          return <LikedProfiles isDarkMode={isDarkMode} onOpenChat={onOpenChat} />
+          return <NearbyMatching
+          isDarkMode={isDarkMode} 
+          onOpenChat={onOpenChat}
+         />
         default:
           return null
       }
@@ -102,6 +107,30 @@ const MobileLayout = React.memo(
 
         {/* Main Content */}
         <div className="relative z-10 flex-1 flex items-center justify-center p-6 pt-2">{renderContent()}</div>
+
+        {/* 모바일 전용 플로팅 액션 버튼 */}
+        <MobileFAB isLoading={false} onAddClick={() => setShowLikedModal(true)} />
+
+        {/* 좋아요 프로필 모달 */}
+        <Modal
+          isOpen={showLikedModal}
+          onRequestClose={() => setShowLikedModal(false)}
+          contentLabel="좋아요한 프로필"
+          className="backdrop-blur-xl bg-white/90 rounded-3xl max-w-md w-full mx-4 p-4 shadow-2xl border border-white/50"
+          overlayClassName="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          ariaHideApp={false}
+        >
+          <div className="flex flex-col items-center">
+            <button
+              onClick={() => setShowLikedModal(false)}
+              className="self-end mb-2 text-2xl text-gray-400 hover:text-gray-700"
+              aria-label="닫기"
+            >
+              ×
+            </button>
+            <LikedProfiles isDarkMode={isDarkMode} onOpenChat={onOpenChat} />
+          </div>
+        </Modal>
       </div>
     )
   },

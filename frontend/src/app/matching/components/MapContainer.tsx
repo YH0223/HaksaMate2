@@ -37,7 +37,7 @@ export const MapContainer = React.memo(
             : "bg-white/90 backdrop-blur-xl border border-gray-200/60"
         } shadow-2xl`}
       >
-        <div className="h-64 lg:h-80 relative">
+        <div className="h-[600px] lg:h-[800px] relative">
           {!mapLoaded && (
             <div
               className={`absolute inset-0 flex items-center justify-center z-10 ${

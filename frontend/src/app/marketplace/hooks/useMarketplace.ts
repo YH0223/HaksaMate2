@@ -1,60 +1,67 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import type { Product, CreateProductRequest, UpdateProductRequest, SearchFilters } from "../types"
-
+import type { Product, CreateProductRequest, UpdateProductRequest, SearchFilters,SearchResult } from "../types"
+import { supabase } from "@/lib/supabaseClient"
+import {useAuth} from "@/hooks/useAuth"
+import {fetchProfile} from "@/lib/profile"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 export const useMarketplace = () => {
   const [products, setProducts] = useState<Product[]>([])
   const [isMarketplaceLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
+  const [total, setTotal] = useState(0)
+  const {user}=useAuth()
   const loadProducts = useCallback(async (userId?: string, filters?: SearchFilters) => {
     setIsLoading(true)
     setError(null)
-  
+
     try {
-      console.log("📦 상품 목록 요청 시작")
-  
+      console.log("📦 상품 목록 요청 시작 (클라이언트 필터링)")
+
+      // 모든 상품을 가져옵니다. (필터링 파라미터 없이)
       const response = await fetch(`${API_BASE_URL}/api/items`)
       if (!response.ok) throw new Error("상품 목록 조회에 실패했습니다.")
-  
-      const products: Product[] = await response.json()
-      console.log("✅ 상품 목록 응답:", products)
-      console.log("👤 userId:", userId)
-  
+
+      const allProducts: Product[] = await response.json()
+      console.log("✅ 모든 상품 응답:", allProducts)
+
       let likedMap: Record<number, boolean> = {}
       let likeCountMap: Record<number, number> = {}
-  
+
       if (userId) {
         console.log("❤️ 좋아요 상태 요청:", `${API_BASE_URL}/api/likes/my?userId=${userId}`)
         const likesRes = await fetch(`${API_BASE_URL}/api/likes/my?userId=${userId}`)
         if (likesRes.ok) {
           const likes = await likesRes.json()
           console.log("✅ 좋아요 목록 응답:", likes)
-  
-          // 여기 수정
+
           likedMap = Object.fromEntries(likes.map((item: { itemid: number }) => [item.itemid, true]))
-          likeCountMap = Object.fromEntries(likes.map((item: { itemid: number; likeCount: number }) => [item.itemid, item.likeCount]))
+          likeCountMap = Object.fromEntries(
+            likes.map((item: { itemid: number; likeCount: number }) => [item.itemid, item.likeCount]),
+          )
         } else {
           console.warn("⚠️ 좋아요 상태 조회 실패:", likesRes.status)
         }
       }
-  
-      // ✅ 좋아요 개수 별도 병합하지 않아도 likeCountMap으로 충분히 해결 가능
-      const productsWithLikes = products.map((product) => {
-        const merged = {
-          ...product,
-          isLiked: likedMap[product.itemid] || false,
-          likeCount: likeCountMap[product.itemid] ?? 0,
-        }
-        console.log("🔄 병합된 상품:", merged)
-        return merged
-      })
-  
-      setProducts(productsWithLikes)
-      return productsWithLikes
+
+      // 좋아요 정보 병합
+      const productsWithLikes = allProducts.map((product) => ({
+        ...product,
+        isLiked: likedMap[product.itemid] || false,
+        likeCount: likeCountMap[product.itemid] ?? 0,
+      }))
+
+      // 클라이언트 측 필터링 적용
+      let filteredProducts = productsWithLikes
+      if (filters?.category && filters.category !== "all") {
+        filteredProducts = filteredProducts.filter((product) => product.category === filters.category)
+        console.log(`➡️ 카테고리 필터링 적용: ${filters.category}, 결과: ${filteredProducts.length}개`)
+      }
+
+      setProducts(filteredProducts)
+      return filteredProducts
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "상품 목록 조회에 실패했습니다."
       console.error("❌ 에러 발생:", errorMessage)
@@ -69,43 +76,128 @@ export const useMarketplace = () => {
   
   
   
-  const searchProducts = useCallback(async (keyword: string, filters?: SearchFilters) => {
+
+const searchProducts = useCallback(
+  async (
+    userId:String|undefined,
+    keyword: string,
+    filters?: SearchFilters,
+    page = 1,
+    limit = 20
+  ): Promise<SearchResult> => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const queryParams = new URLSearchParams()
-      queryParams.append("keyword", keyword)
-      if (filters?.category && filters.category !== "전체") {
-        queryParams.append("category", filters.category)
-      }
-      if (filters?.minPrice) {
-        queryParams.append("minPrice", filters.minPrice.toString())
-      }
-      if (filters?.maxPrice) {
-        queryParams.append("maxPrice", filters.maxPrice.toString())
-      }
-      if (filters?.sortBy) {
-        queryParams.append("sortBy", filters.sortBy)
+      let query = supabase.from("item").select("*", { count: "exact" })
+
+      if (keyword && keyword.trim()) {
+        const searchTerm = keyword.trim()
+        const orCondition = `title.ilike.*${searchTerm}*,description.ilike.*${searchTerm}*`
+        query = query.or(orCondition, { foreignTable: undefined })
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/items/search?${queryParams.toString()}`)
-
-      if (!response.ok) {
-        throw new Error("상품 검색에 실패했습니다.")
+      if (filters?.category && filters.category !== "all") {
+        query = query.eq("category", filters.category)
       }
 
-      const products = await response.json()
-      setProducts(products)
-      return products
+      if (filters?.minPrice !== undefined) {
+        query = query.gte("price", filters.minPrice)
+      }
+
+      if (filters?.maxPrice !== undefined) {
+        query = query.lte("price", filters.maxPrice)
+      }
+
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+      query = query.range(from, to)
+
+      const { data: items, error, count } = await query
+      if (error) throw error
+
+      const itemIds = items.map((item) => item.itemid)
+
+      // 이미지 조회
+      const { data: imageData, error: imageError } = await supabase
+        .from("item_images")
+        .select("item_itemid, photo_path")
+        .in("item_itemid", itemIds)
+      if (imageError) throw imageError
+
+      const imageMap = new Map<number, string[]>()
+      imageData?.forEach(({ item_itemid, photo_path }) => {
+        const list = imageMap.get(item_itemid) ?? []
+        list.push(photo_path)
+        imageMap.set(item_itemid, list)
+      })
+
+      // ✅ 로그인 사용자 ID 필요
+      const currentUserId =  userId// 직접 구현한 함수 또는 context에서 가져오기
+      
+      // 좋아요 정보 병합
+      const productsWithAll: Product[] = await Promise.all(
+        items.map(async (item) => {
+          const images = imageMap.get(item.itemid) ?? []
+
+          // 좋아요 개수
+          const likeCountRes = await fetch(`${API_BASE_URL}/api/likes/${item.itemid}/count`)
+          const likeCount = likeCountRes.ok ? await likeCountRes.json() : 0
+
+          // isLiked
+          let isLiked = false
+          console.log("현재유저:@@@@",currentUserId)
+          if (currentUserId) {
+            const isLikedRes = await fetch(
+              `${API_BASE_URL}/api/likes/${item.itemid}/is-liked?userId=${currentUserId}`
+            )
+            isLiked = isLikedRes.ok ? await isLikedRes.json() : false
+          }
+          const sellerprofile=await fetchProfile(item.seller_id)
+          return {
+            ...item,
+            sellerId: item.seller_id,
+            buyerId: item.buyer_id,
+            sellerName:sellerprofile.name,
+            completedDate: item.completed_date,
+            meetLocation: {
+              address: item.meet_location_address ?? "",
+              lat: item.meet_location_lat ?? 0,
+              lng: item.meet_location_lng ?? 0,
+            },
+            itemImages: images,
+            imageUrl: images[0] ?? "",
+            isLiked,
+            likeCount,
+          } as Product
+        })
+      )
+
+      const result: SearchResult = {
+        products: productsWithAll,
+        total: count || 0,
+        page,
+        limit,
+      }
+
+      setProducts(result.products)
+      setTotal(result.total)
+
+      return result
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "상품 검색에 실패했습니다."
+      const errorMessage =
+        err instanceof Error ? err.message : "상품 검색에 실패했습니다."
       setError(errorMessage)
+      console.error("❗ 검색 오류:", err)
       throw new Error(errorMessage)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  },
+  []
+)
+
+  
 
   const getProduct = useCallback(async (id: number): Promise<Product | null> => {
     try {

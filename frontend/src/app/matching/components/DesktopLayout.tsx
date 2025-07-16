@@ -5,7 +5,6 @@ import SegmentControl from "./SegmentControl"
 import MatchingContent from "./MatchingContent"
 import NearbyMatching from "./NearbyMatching"
 import LikedProfiles from "./LikedProfiles"
-import SidePanel from "./SidePanel"
 import type { SegmentType, Profile } from "../types"
 
 interface DesktopLayoutProps {
@@ -71,11 +70,30 @@ const DesktopLayout = React.memo(
             />
           )
         case "nearby":
-          return <NearbyMatching isDarkMode={isDarkMode} />
-        case "liked":
-          return <LikedProfiles isDarkMode={isDarkMode} onOpenChat={onOpenChat} />
+          return <NearbyMatching
+            isDarkMode={isDarkMode} 
+            onStartChat={onOpenChat}
+           />
         default:
-          return null
+          // 기본값으로 매칭 컨텐츠 반환
+          return (
+            <MatchingContent
+              profile={profile}
+              isDarkMode={isDarkMode}
+              exitX={exitX}
+              dragX={dragX}
+              dragY={dragY}
+              rotation={rotation}
+              isAnimating={isAnimating}
+              isDragging={isDragging}
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+              onMouseDown={onMouseDown}
+              onLike={onLike}
+              onDislike={onDislike}
+            />
+          )
       }
     }, [
       activeSegment,
@@ -105,19 +123,35 @@ const DesktopLayout = React.memo(
           </div>
 
           {/* PC 메인 컨텐츠 */}
-          <div className="grid grid-cols-12 gap-8 h-[calc(100vh-200px)]">
-            {/* 왼쪽 패널 - 프로필 카드 */}
-            <div className="col-span-5 flex items-center justify-center">
-              <div className="w-full max-w-md">{renderContent()}</div>
-            </div>
+          <div className="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+            {/* 왼쪽 패널 - 매칭/근처 탭 모두 중앙 정렬 */}
+            {activeSegment === "nearby" ? (
+              <div className="col-span-4 flex items-center justify-center mx-auto">
+                <div className="w-full max-w-md flex flex-col items-center justify-center mx-auto">
+                  <LikedProfiles isDarkMode={isDarkMode} onOpenChat={onOpenChat} />
+                </div>
+              </div>
+            ) : (
+              <div className="col-span-4 flex items-center justify-center mx-auto">
+                <div className="w-full max-w-md flex flex-col items-center justify-center mx-auto">
+                  {renderContent()}
+                </div>
+              </div>
+            )}
 
             {/* 가운데 구분선 */}
             <div className="col-span-1 flex items-center justify-center">
               <div className={`w-px h-full ${isDarkMode ? "bg-gray-700" : "bg-gray-200"} opacity-50`} />
             </div>
 
-            {/* 오른쪽 패널 - 추가 정보 */}
-            <SidePanel isDarkMode={isDarkMode} />
+            {/* 오른쪽 패널 - 매칭/근처 탭 모두 NearbyMatching 사용 (살짝만 작게) */}
+            <div className="col-span-7 flex items-center justify-center">
+              <div className="w-full max-w-xl">
+                <NearbyMatching 
+                  isDarkMode={isDarkMode}  
+                  onOpenChat={onOpenChat} />
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -26,7 +26,7 @@ export const useGeolocation = () => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 300000, // 5분 캐시
+          maximumAge: 0, // 5분 캐시
         })
       })
 

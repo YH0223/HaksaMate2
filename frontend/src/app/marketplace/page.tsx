@@ -90,7 +90,7 @@ const MarketplacePage: React.FC = () => {
         category: selectedCategory,
         sortBy: "latest",
       }
-      searchProducts(searchQuery, filters)
+      searchProducts(user?.id,searchQuery, filters)
     } else {
       const filters: SearchFilters = {
         category: selectedCategory,
@@ -264,17 +264,15 @@ const MarketplacePage: React.FC = () => {
     setShowAddProduct(false)
   }, [selectedCategory, loadProducts])
 
-  const handleProductUpdated = useCallback(() => {
-    // 상품 수정 후 목록 새로고침
+  useEffect(() => {
+    if (!user?.id || isLoading) return;
+  
     const filters: SearchFilters = {
       category: selectedCategory,
       sortBy: "latest",
     }
-    loadProducts(user?.id,filters)
-    setShowEditProduct(false)
-    setEditingProduct(null)
-    setSelectedProduct(null)
-  }, [selectedCategory, loadProducts])
+    loadProducts(user.id, filters)
+  }, [user?.id, isLoading, selectedCategory, loadProducts])
   
   return (
     <>
@@ -460,7 +458,7 @@ const MarketplacePage: React.FC = () => {
           }}
           sellerId={chatSellerId}
           isDarkMode={isDarkMode}
-        />
+        />  
       )}
 
       {showReportModal && reportingProduct && (

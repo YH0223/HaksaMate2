@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { Client } from "@stomp/stompjs"
-
+import { fetchProfile } from "@/lib/profile"
 export interface LocationData {
   userId: string
   userName: string

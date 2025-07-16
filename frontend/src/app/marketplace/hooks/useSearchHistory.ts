@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { supabase } from "@/lib/supabaseClient"
 import type { SearchHistory, SearchSuggestion } from "../types"
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
 export const useSearchHistory = () => {
   const [searchHistory, setSearchHistory] = useState<SearchHistory[]>([])
@@ -12,28 +11,47 @@ export const useSearchHistory = () => {
   const [error, setError] = useState<string | null>(null)
 
   const addSearchHistory = useCallback(async (userId: string, keyword: string) => {
+    if (!userId || !keyword || !keyword.trim()) {
+      throw new Error("사용자 ID와 키워드는 필수입니다.")
+    }
+
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/search-history`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ userId, keyword }),
-      })
+      // 기존에 같은 키워드가 있는지 확인
+      const { data: existingHistory } = await supabase
+        .from("search_history")
+        .select("id")
+        .eq("profile_id", userId)
+        .eq("keyword", keyword.trim())
+        .single()
 
-      if (!response.ok) {
-        throw new Error("검색 기록 저장에 실패했습니다.")
+      if (existingHistory) {
+        // 기존 기록이 있으면 삭제 후 새로 추가 (최신 순서로 정렬하기 위해)
+        await supabase.from("search_history").delete().eq("id", existingHistory.id)
       }
 
-      const history = await response.json()
-      setSearchHistory((prev) => [history, ...prev.filter((h) => h.keyword !== keyword)])
-      return history
+      // 새로운 검색 기록 추가
+      const { data, error } = await supabase
+        .from("search_history")
+        .insert({
+          profile_id: userId,
+          keyword: keyword.trim(),
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // 로컬 상태 업데이트
+      setSearchHistory((prev) => [data, ...prev.filter((h) => h.keyword !== keyword.trim())])
+
+      return data
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "검색 기록 저장에 실패했습니다."
       setError(errorMessage)
+      console.error("Add search history error:", err)
       throw new Error(errorMessage)
     } finally {
       setIsLoading(false)
@@ -41,8 +59,7 @@ export const useSearchHistory = () => {
   }, [])
 
   const getSearchHistory = useCallback(async (userId: string) => {
-    // 입력값 검증
-    if (!userId || typeof userId !== "string" || !userId.trim()) {
+    if (!userId || !userId.trim()) {
       setSearchHistory([])
       return []
     }
@@ -51,19 +68,16 @@ export const useSearchHistory = () => {
     setError(null)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/search-history?userId=${userId}`)
+      const { data, error } = await supabase
+        .from("search_history")
+        .select("*")
+        .eq("profile_id", userId)
+        .order("search_at", { ascending: false })
+        .limit(50) // 최근 50개만 가져오기
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          // 검색 기록이 없는 경우
-          setSearchHistory([])
-          return []
-        }
-        throw new Error("검색 기록 조회에 실패했습니다.")
-      }
+      if (error) throw error
 
-      const history = await response.json()
-      const validHistory = Array.isArray(history) ? history : []
+      const validHistory = Array.isArray(data) ? data : []
       setSearchHistory(validHistory)
       return validHistory
     } catch (err) {
@@ -78,7 +92,7 @@ export const useSearchHistory = () => {
   }, [])
 
   const deleteSearchHistory = useCallback(async (historyId: string) => {
-    if (!historyId || typeof historyId !== "string" || !historyId.trim()) {
+    if (!historyId || !historyId.trim()) {
       return
     }
 
@@ -86,14 +100,11 @@ export const useSearchHistory = () => {
     setError(null)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/search-history/${encodeURIComponent(historyId.trim())}`, {
-        method: "DELETE",
-      })
+      const { error } = await supabase.from("search_history").delete().eq("id", historyId)
 
-      if (!response.ok) {
-        throw new Error("검색 기록 삭제에 실패했습니다.")
-      }
+      if (error) throw error
 
+      // 로컬 상태에서 제거
       setSearchHistory((prev) => prev.filter((h) => h.id !== historyId))
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "검색 기록 삭제에 실패했습니다."
@@ -104,12 +115,8 @@ export const useSearchHistory = () => {
     }
   }, [])
 
-
-
-
   const getSuggestions = useCallback(async (userId: string, keyword: string) => {
-    // 입력값 검증
-    if (!userId || !keyword || typeof keyword !== "string" || !keyword.trim()) {
+    if (!userId || !keyword || !keyword.trim()) {
       setSuggestions([])
       return []
     }
@@ -118,23 +125,31 @@ export const useSearchHistory = () => {
     setError(null)
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/search-history/suggest?userId=${encodeURIComponent(userId.trim())}&keyword=${encodeURIComponent(keyword.trim())}`,
-      )
+      // 키워드를 포함하는 검색 기록을 찾아서 제안으로 사용
+      const { data, error } = await supabase
+        .from("search_history")
+        .select("keyword")
+        .eq("profile_id", userId)
+        .ilike("keyword", `%${keyword.trim()}%`)
+        .order("search_at", { ascending: false })
+        .limit(10)
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          // 제안이 없는 경우
-          setSuggestions([])
-          return []
-        }
-        throw new Error("검색 제안 조회에 실패했습니다.")
-      }
+      if (error) throw error
 
-      const suggestions = await response.json()
-      const validSuggestions = Array.isArray(suggestions) ? suggestions : []
-      setSuggestions(validSuggestions)
-      return validSuggestions
+      // 중복 제거 및 빈도수 계산
+      const keywordCount = new Map<string, number>()
+
+      data?.forEach((item) => {
+        const count = keywordCount.get(item.keyword) || 0
+        keywordCount.set(item.keyword, count + 1)
+      })
+
+      const suggestions: SearchSuggestion[] = Array.from(keywordCount.entries())
+        .map(([keyword, count]) => ({ keyword, count }))
+        .sort((a, b) => b.count - a.count) // 빈도수 높은 순으로 정렬
+
+      setSuggestions(suggestions)
+      return suggestions
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "검색 제안 조회에 실패했습니다."
       setError(errorMessage)
@@ -147,7 +162,7 @@ export const useSearchHistory = () => {
   }, [])
 
   const clearSearchHistory = useCallback(async (userId: string) => {
-    if (!userId || typeof userId !== "string" || !userId.trim()) {
+    if (!userId || !userId.trim()) {
       return
     }
 
@@ -155,13 +170,9 @@ export const useSearchHistory = () => {
     setError(null)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/search-history/clear/${encodeURIComponent(userId.trim())}`, {
-        method: "DELETE",
-      })
+      const { error } = await supabase.from("search_history").delete().eq("profile_id", userId)
 
-      if (!response.ok) {
-        throw new Error("검색 기록 전체 삭제에 실패했습니다.")
-      }
+      if (error) throw error
 
       setSearchHistory([])
     } catch (err) {
@@ -172,20 +183,16 @@ export const useSearchHistory = () => {
       setIsLoading(false)
     }
   }, [])
+
   return {
     searchHistory,
     suggestions,
     isLoading,
     error,
-    clearSearchHistory,
-    getSuggestions,
     addSearchHistory,
     getSearchHistory,
     deleteSearchHistory,
+    getSuggestions,
+    clearSearchHistory,
   }
 }
-
-
-
-
-

@@ -74,7 +74,7 @@ export interface LocationData {
 
 
 export interface Review {
-  id: string
+  id: number |string
   itemId: string
   sellerId: string
   buyerId: string
@@ -132,4 +132,11 @@ export interface KakaoMapState {
   apiKeyError: string | null
   loadingMessage: string
   apiKey: string | null
+}
+
+export interface SearchResult {
+  products: Product[]
+  total: number
+  page: number
+  limit: number
 }
