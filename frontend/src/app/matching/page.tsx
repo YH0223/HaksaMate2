@@ -4,6 +4,8 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
+import { AuthGuard } from "@/components/AuthGuard"
+import { useAuth } from "@/hooks/useAuth"
 
 // Components
 import AnimatedBackground from "./components/AnimatedBackground"
@@ -12,7 +14,7 @@ import DesktopLayout from "./components/DesktopLayout"
 import MobileLayout from "./components/MobileLayout"
 import MatchSuccessModal from "./components/MatchSuccessModal"
 
-// Sidebar and ChatModal (assuming these exist)
+// Sidebar and ChatModal
 import Sidebar from "../sidebar/sidebar"
 import ChatModal from "@/components/ChatModal"
 
@@ -21,14 +23,15 @@ import { useMatchingLogic } from "./hooks/useMatchingLogic"
 import { useDragHandlers } from "./hooks/useDragHandlers"
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts"
 import { useChatRooms } from "@/hooks/useChat"
-import { OtherProfileModal } from "../components/OthersProfileModal"
+
 // Constants
 import { ANIMATION_DURATION } from "./constants"
 
 import "./styles.css"
 
-const MatchingPage: React.FC = () => {
+function MatchingPageContent() {
   const router = useRouter()
+  const { user } = useAuth()
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [exitX, setExitX] = useState(0)
@@ -44,7 +47,6 @@ const MatchingPage: React.FC = () => {
     activeSegment,
     profile,
     isProfilesLoading,
-    user,
     chatModalOpen,
     matchedProfile,
     setIndex,
@@ -105,8 +107,8 @@ const MatchingPage: React.FC = () => {
   // 좋아요한 프로필에서 채팅 시작
   const handleOpenChatFromLiked = useCallback(
     async (profileId: string) => {
-      console.log("💬 handleOpenChatFromLiked 호출됨. profileId:", profileId, "user:", user?.id);
-      
+      console.log("💬 handleOpenChatFromLiked 호출됨. profileId:", profileId, "user:", user?.id)
+
       if (!user?.id) {
         console.error("❌ 사용자 정보가 없음")
         return
@@ -293,10 +295,23 @@ const MatchingPage: React.FC = () => {
             isDarkMode={isDarkMode}
           />
         )}
-
       </div>
     </>
   )
 }
 
-export default MatchingPage
+const MatchingPage: React.FC = () => {
+  return (
+    <AuthGuard>
+      <MatchingPageContent />
+    </AuthGuard>
+  )
+}
+
+export default function Page() {
+  return (
+    <AuthGuard>
+      <MatchingPage />
+    </AuthGuard>
+  )
+}

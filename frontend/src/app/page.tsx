@@ -3,13 +3,13 @@
 import { useEffect, useState, useMemo, useCallback } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabaseClient"
+import { AuthGuard } from "@/components/AuthGuard"
 import { useAuth } from "@/hooks/useAuth"
 import { useSubjects, type Subject } from "@/hooks/useSubjects"
 import { useTimetable } from "@/hooks/useTimetable"
 import { showToast, ToastContainer } from "./components/toast"
 import { BookOpen, Plus } from "lucide-react"
-import { fetchExams, fetchChecklist, type Exam, type ChecklistItem } from "@/lib/examApi"
+import { fetchExams, fetchChecklist, type Exam } from "@/lib/examApi"
 
 // Components
 import Sidebar from "./sidebar/sidebar"
@@ -42,9 +42,9 @@ const SUBJECT_COLORS = [
   "bg-gradient-to-br from-cyan-500/90 to-blue-600/90 backdrop-blur-sm",
 ]
 
-export default function Page() {
+function HomePage() {
   const router = useRouter()
-  const { user, isLoading: isAuthLoading } = useAuth()
+  const { user, logout } = useAuth()
 
   const [form, setForm] = useState<Omit<Subject, "id" | "user_id">>({
     name: "",
@@ -56,34 +56,35 @@ export default function Page() {
   const [editId, setEditId] = useState<number | null>(null)
   const [timeError, setTimeError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
-  const [showSubjectModal, setShowSubjectModal] = useState(false) // 과목 관리 모달 상태 추가
-  const [showTimerModal, setShowTimerModal] = useState(false) // 타이머 모달 상태 추가
+  const [showSubjectModal, setShowSubjectModal] = useState(false)
+  const [showTimerModal, setShowTimerModal] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
-
-  // 🔧 리다이렉트 방지를 위한 상태 추가
-  const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
 
   const { subjects, isLoading, addSubject, updateSubject, deleteSubject } = useSubjects(user?.id || null)
   const { timetable, isLoading: isTimetableLoading, saveTimetable, loadTimetable } = useTimetable(user?.id)
 
   // D-Day 연동용 시험 데이터 state 추가
-  const [examTasks, setExamTasks] = useState<{
-    id: string
-    title: string
-    subject: string
-    dueDate: string
-  }[]>([])
+  const [examTasks, setExamTasks] = useState<
+    {
+      id: string
+      title: string
+      subject: string
+      dueDate: string
+    }[]
+  >([])
 
   // 체크리스트 데이터 state 추가
-  const [checklistItems, setChecklistItems] = useState<{
-    id: string
-    text: string
-    done: boolean
-    examId: number
-    examSubject: string
-  }[]>([])
+  const [checklistItems, setChecklistItems] = useState<
+    {
+      id: string
+      text: string
+      done: boolean
+      examId: number
+      examSubject: string
+    }[]
+  >([])
 
   // 시험 데이터와 체크리스트 불러오기
   useEffect(() => {
@@ -91,17 +92,15 @@ export default function Page() {
       if (!user?.id) return
       try {
         const exams: Exam[] = await fetchExams(user.id)
-        // DashboardPanel Task 타입에 맞게 변환
         setExamTasks(
           exams.map((exam) => ({
             id: String(exam.id),
             title: exam.subject + " (" + exam.type + ")",
             subject: exam.subject,
             dueDate: exam.date,
-          }))
+          })),
         )
 
-        // 모든 시험의 체크리스트 불러오기
         const allChecklistItems: {
           id: string
           text: string
@@ -171,51 +170,6 @@ export default function Page() {
     }
     return SUBJECT_COLORS[Math.abs(hash) % SUBJECT_COLORS.length]
   }, [])
-
-  // 🔧 인증 체크 로직 개선 - 무한 리다이렉트 방지
-  useEffect(() => {
-    console.log("🔍 인증 상태 체크:", {
-      isAuthLoading,
-      hasUser: !!user,
-      hasCheckedAuth,
-      userEmail: user?.email,
-    })
-
-    // 로딩 중이면 아무것도 하지 않음
-    if (isAuthLoading) {
-      console.log("⏳ 아직 로딩 중...")
-      return
-    }
-
-    // 🔧 인증 체크 완료 표시
-    if (!hasCheckedAuth) {
-      setHasCheckedAuth(true)
-      console.log("✅ 인증 체크 완료")
-    }
-
-    // 🔧 로딩 완료 후 사용자가 없으면 리다이렉트 (한 번만)
-    if (!user && hasCheckedAuth) {
-      console.log("❌ 인증되지 않은 사용자 - 로그인 페이지로 리다이렉트")
-      router.replace("/auth/login")
-      return
-    }
-
-    if (user) {
-      console.log("✅ 인증된 사용자:", user.email)
-    }
-  }, [user, isAuthLoading, hasCheckedAuth, router])
-
-  // 🔧 강제 타임아웃 제거 (무한 리다이렉트 방지)
-  // useEffect(() => {
-  //   const timeout = setTimeout(() => {
-  //     if (isAuthLoading) {
-  //       console.warn("⚠️ 인증 확인 타임아웃 - 강제로 로그인 페이지로 이동")
-  //       router.replace("/auth/login")
-  //     }
-  //   }, 10000)
-
-  //   return () => clearTimeout(timeout)
-  // }, [isAuthLoading, router])
 
   const timeToMinutes = useCallback((time: string) => {
     const [h, m] = time.split(":").map(Number)
@@ -414,14 +368,12 @@ export default function Page() {
   const handleLogout = useCallback(async () => {
     try {
       console.log("🚪 로그아웃 시작...")
-      await supabase.auth.signOut()
-      console.log("✅ 로그아웃 완료")
+      await logout()
       showToast({
         type: "success",
         title: "로그아웃 완료",
         message: "안전하게 로그아웃되었습니다.",
       })
-      // 로그아웃 후 로그인 페이지로 이동
       router.push("/auth/login")
     } catch (error) {
       console.error("❌ 로그아웃 실패:", error)
@@ -431,56 +383,12 @@ export default function Page() {
         message: "로그아웃 중 오류가 발생했습니다.",
       })
     }
-  }, [router])
+  }, [logout, router])
 
   const handleAddClick = useCallback(() => {
     resetForm()
     setShowModal(true)
   }, [resetForm])
-
-  // 🔐 로딩 화면 - 더 간단하게
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-8">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">인증 확인 중...</h2>
-          <p className="text-gray-600">잠시만 기다려주세요.</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 🔧 인증 체크가 완료되지 않았으면 로딩 화면 유지
-  if (!hasCheckedAuth) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-8">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">인증 처리 중...</h2>
-          <p className="text-gray-600">잠시만 기다려주세요.</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🔒</div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">접근 권한이 없습니다</h1>
-          <p className="text-gray-600 mb-4">로그인이 필요한 페이지입니다.</p>
-          <button
-            onClick={() => router.push("/auth/login")}
-            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            로그인 페이지로 이동
-          </button>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <>
@@ -534,10 +442,7 @@ export default function Page() {
         <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
         <div className="flex-1 font-sans lg:ml-0 relative z-10">
-          <Header 
-            onProfileClick={() => setShowProfileModal(true)} 
-            onTimerClick={() => setShowTimerModal(true)}
-          />
+          <Header onProfileClick={() => setShowProfileModal(true)} onTimerClick={() => setShowTimerModal(true)} />
 
           <div className="flex flex-col gap-4 sm:gap-6 lg:gap-8 p-3 sm:p-6 lg:p-8 max-w-[95rem] mx-auto">
             {/* 과목 관리 버튼 */}
@@ -561,9 +466,7 @@ export default function Page() {
                   <BookOpen className="h-4 w-4 text-white" />
                 </motion.div>
                 <span className="font-medium text-lg">과목 관리</span>
-                <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-medium">
-                  {subjects.length}개
-                </span>
+                <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-medium">{subjects.length}개</span>
                 <Plus className="h-5 w-5 text-white/80" />
               </motion.button>
             </motion.div>
@@ -582,11 +485,7 @@ export default function Page() {
               />
 
               {/* 대시보드 */}
-              <DashboardPanel
-                subjects={subjects}
-                tasks={examTasks}
-                checklistItems={checklistItems}
-              />
+              <DashboardPanel subjects={subjects} tasks={examTasks} checklistItems={checklistItems} />
             </div>
           </div>
 
@@ -608,8 +507,8 @@ export default function Page() {
 
           <ProfileModal
             showProfileModal={showProfileModal}
-            userEmail={user.email}
-            userId={user.id}
+            userEmail={user?.email || ""}
+            userId={user?.id || ""}
             subjects={subjects}
             timetable={timetable}
             onClose={() => setShowProfileModal(false)}
@@ -617,10 +516,7 @@ export default function Page() {
             onSettingsClick={() => router.push("/settings")}
           />
 
-          <TimerModal 
-            isOpen={showTimerModal}
-            onClose={() => setShowTimerModal(false)}
-          />
+          <TimerModal isOpen={showTimerModal} onClose={() => setShowTimerModal(false)} />
 
           {/* 과목 관리 모달 */}
           {showSubjectModal && (
@@ -664,7 +560,7 @@ export default function Page() {
                     </motion.button>
                   </div>
                 </div>
-                
+
                 <div className="p-6 max-h-[70vh] overflow-y-auto">
                   <SubjectManagement
                     subjects={subjects}
@@ -683,5 +579,13 @@ export default function Page() {
 
       <ToastContainer />
     </>
+  )
+}
+
+export default function Page() {
+  return (
+    <AuthGuard>
+      <HomePage />
+    </AuthGuard>
   )
 }

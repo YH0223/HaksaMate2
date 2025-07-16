@@ -52,7 +52,7 @@ export const LocationPermissionRequest = React.memo(
                 isDarkMode ? "text-white" : "text-gray-800"
               }`}
             >
-              주변 매칭
+              내 주변 찾기
             </h3>
             <p
               className={`text-sm leading-relaxed transition-colors duration-500 ${
@@ -61,7 +61,7 @@ export const LocationPermissionRequest = React.memo(
             >
               위치 기반으로 근처에 있는
               <br />
-              사람들과 매칭해보세요
+              사람들과 친해지세요!
             </p>
           </div>
 

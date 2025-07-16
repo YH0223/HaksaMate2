@@ -6,6 +6,6 @@ export const SWIPE_VELOCITY = 400
 export const ANIMATION_DURATION = 600
 
 export const SEGMENTS: SegmentItem[] = [
-  { id: "matching", label: "매칭", icon: Heart },
-  { id: "nearby", label: "근처", icon: MapPin },
+  { id: "matching", label: "친구", icon: Heart },
+  { id: "nearby", label: "좋아요", icon: Star },
 ]

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { Client } from "@stomp/stompjs"
-
+import { fetchProfile } from "@/lib/profile"
 export interface Message {
   id: number
   text: string
@@ -20,12 +20,19 @@ export interface ChatRoom {
   lastMessage?: string
   lastMessageTime?: number
   unreadCount?: number
+  opponentProfileImageUrl?: string
 }
 
 // 백엔드 서버 주소
-const BASE_URL = "http://localhost:8080"
+const BASE_URL=process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 const WS_URL = BASE_URL.replace("http://", "ws://")
-
+// 상대방 정보 가져오기 유틸리티 함수
+const getOpponentInfo = (room: ChatRoom, myUserId: string) => {
+  if (room.chatUsr1Id === myUserId) {
+    return { id: room.chatUsr2Id, name: room.chatUsr2Name,}
+  }
+  return { id: room.chatUsr1Id, name: room.chatUsr1Name }
+}
 // 메시지 관련
 export function useChat(chatRoomId?: number, myUserId?: string) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -236,43 +243,63 @@ export function useChatRooms(userId: string | null) {
   const [isRoomsLoading, setIsRoomsLoading] = useState(false)
 
   console.log("🏠 useChatRooms 호출됨:", { userId })
-
   const loadRooms = useCallback(async () => {
     if (!userId) {
       console.log("⚠️ userId가 없어서 채팅방 로드 중단")
+      setRooms([]) // userId가 없으면 방 목록을 비웁니다.
+      setIsRoomsLoading(false)
       return
     }
-
     console.log("📡 채팅방 목록 로드 시작:", userId)
     setIsRoomsLoading(true)
 
     try {
       const url = `${BASE_URL}/api/chat-rooms?userId=${userId}`
       console.log("📡 요청 URL:", url)
-
       const res = await fetch(url)
-
       if (!res.ok) {
         console.error("❌ 채팅방 목록 로드 실패:", res.status, res.statusText)
         throw new Error(`채팅방 목록 불러오기 실패: ${res.status}`)
       }
-
-      const data = await res.json()
+      const data: ChatRoom[] = await res.json() // ChatRoom[] 타입으로 명시
       console.log("✅ 채팅방 목록 로드 성공:", data.length, "개")
 
       // 🔧 중복 채팅방 제거 (같은 chatroomId 기준)
-      const uniqueRooms = data.filter((room: ChatRoom, index: number, self: ChatRoom[]) => 
-        index === self.findIndex(r => r.chatroomId === room.chatroomId)
+      const uniqueRooms = data.filter(
+        (room: ChatRoom, index: number, self: ChatRoom[]) =>
+          index === self.findIndex((r) => r.chatroomId === room.chatroomId),
       )
-
       console.log("🔧 중복 제거 후:", uniqueRooms.length, "개")
-      setRooms(uniqueRooms)
+
+      // 각 채팅방의 상대방 프로필 이미지를 비동기적으로 불러와서 추가
+      const enrichedRooms: ChatRoom[] = await Promise.all(
+        uniqueRooms.map(async (room) => {
+          const opponent = getOpponentInfo(room, userId)
+          let opponentProfileImageUrl: string | undefined = "/placeholder.svg?height=40&width=40" // 기본 이미지
+
+          try {
+            const profile = await fetchProfile(opponent.id)
+            if (profile?.profile_image_url) {
+              opponentProfileImageUrl = profile.profile_image_url
+            }
+          } catch (profileError) {
+            console.warn(`상대방 프로필 이미지 로드 실패 (${opponent.id}):`, profileError)
+            // 실패 시 기본 이미지 유지
+          }
+
+          return {
+            ...room,
+            opponentProfileImageUrl,
+          }
+        }),
+      )
+      setRooms(enrichedRooms)
     } catch (error) {
       console.error("❌ 채팅방 목록 로드 에러:", error)
     } finally {
       setIsRoomsLoading(false)
     }
-  }, [userId])
+  }, [userId]) 
 
   // 🔧 채팅방 생성 또는 기존 방 찾기 개선
   const createRoom = useCallback(async (chatUsr1Id: string, chatUsr2Id: string) => {
@@ -350,5 +377,7 @@ export function useChatRooms(userId: string | null) {
     if (userId) loadRooms()
   }, [userId, loadRooms])
 
-  return { rooms, isRoomsLoading, loadRooms, createRoom, deleteRoom }
+
+  
+  return { rooms, isRoomsLoading, loadRooms, createRoom, deleteRoom}
 }

@@ -2,18 +2,17 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
-import { X, Send, Smile, User, MessageCircle, Search } from "lucide-react"
+import { X, Send, Smile, User, MessageCircle, Search, Trash2 } from "lucide-react"
 import { useChat, useChatRooms } from "../hooks/useChat"
 import { supabase } from "@/lib/supabaseClient"
 
-import { StatusIndicator } from '@/components/ui/StatusIndicator'
-import {useGlobalProfile } from "./GlobalProfileProvider"
-
+import { StatusIndicator } from "@/components/ui/StatusIndicator"
+import { useGlobalProfile } from "./GlobalProfileProvider"
 interface ChatModalProps {
   isOpen: boolean
   onClose: () => void
   initialRoomId?: number
-  sellerId?: string | null// 🔧 sellerId prop 추가
+  sellerId?: string | null // 🔧 sellerId prop 추가
   isDarkMode: boolean
 }
 
@@ -34,6 +33,7 @@ export interface ChatRoom {
   lastMessage?: string
   lastMessageTime?: number
   unreadCount?: number
+  opponentProfileImageUrl?: string // useChat.ts에서 추가된 필드
 }
 
 const getOpponentInfo = (room: ChatRoom, myUserId: string) => {
@@ -43,6 +43,8 @@ const getOpponentInfo = (room: ChatRoom, myUserId: string) => {
   return { id: room.chatUsr1Id, name: room.chatUsr1Name }
 }
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL
+
 const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, sellerId, isDarkMode }) => {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null)
@@ -51,7 +53,15 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
   const [isMobile, setIsMobile] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { profile } = useGlobalProfile()
+  const [hasAttemptedRoomCreation, setHasAttemptedRoomCreation] = useState(false) // 🔧 새 상태 추가
+
   // 유저 정보 조회 (Supabase 사용)
+  const { rooms, isRoomsLoading, loadRooms, createRoom, deleteRoom } = useChatRooms(user?.id ?? null)
+  const { messages, sendMessage, isMessagesLoading, loadMessages, isConnected } = useChat(
+    selectedRoomId ?? undefined,
+    user?.id ?? "",
+  )
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
@@ -63,6 +73,23 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
     })
   }, [])
 
+  useEffect(() => {
+    const markAsRead = async () => {
+      if (selectedRoomId && user?.id) {
+        try {
+          await fetch(`${BASE_URL}/api/chat-rooms/${selectedRoomId}/read?userId=${user.id}`, {
+            method: "PUT",
+          })
+          console.log("✅ 읽음 처리 완료")
+        } catch (e) {
+          console.error("❌ 읽음 처리 실패", e)
+        }
+      }
+    }
+
+    markAsRead()
+  }, [selectedRoomId, user])
+
   // initialRoomId가 있으면 해당 방을 선택
   useEffect(() => {
     if (initialRoomId) {
@@ -73,11 +100,13 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
 
   // 🔧 sellerId가 있으면 해당 판매자와 채팅방 생성/조회
   useEffect(() => {
-    if (sellerId && user && isOpen) {
+    if (sellerId && user && isOpen && !hasAttemptedRoomCreation) {
+      // 🔧 hasAttemptedRoomCreation 조건 추가
       console.log("🎯 판매자와 채팅방 생성/조회:", sellerId)
       createOrFindRoom(sellerId)
+      setHasAttemptedRoomCreation(true) // 🔧 시도 후 상태 업데이트
     }
-  }, [sellerId, user, isOpen])
+  }, [sellerId, user, isOpen, hasAttemptedRoomCreation]) // 🔧 의존성 배열에 hasAttemptedRoomCreation 추가
 
   // 반응형 대응
   useEffect(() => {
@@ -86,13 +115,6 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
     window.addEventListener("resize", checkMobile)
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
-
-  // 채팅방 목록, 메시지 목록 훅 사용 (Spring Boot 연동)
-  const { rooms, isRoomsLoading, loadRooms, createRoom, deleteRoom } = useChatRooms(user?.id ?? null)
-  const { messages, sendMessage, isMessagesLoading, loadMessages, isConnected } = useChat(
-    selectedRoomId ?? undefined,
-    user?.id ?? "",
-  )
 
   // 🔧 판매자와 채팅방 생성 또는 찾기
   const createOrFindRoom = async (sellerId: string) => {
@@ -195,11 +217,35 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
     isConnected,
   })
 
+  // 채팅방 삭제 핸들러
+  const handleDeleteRoom = useCallback(
+    async (roomId: number, event: React.MouseEvent) => {
+      event.stopPropagation() // 이벤트 버블링 방지 (채팅방 선택 방지)
+      if (window.confirm("정말로 이 채팅방을 삭제하시겠습니까?")) {
+        try {
+          await deleteRoom(roomId)
+          // 현재 선택된 방이 삭제된 방이라면 선택 해제
+          if (selectedRoomId === roomId) {
+            setSelectedRoomId(null)
+          }
+          console.log(`✅ 채팅방 ${roomId} 삭제 완료`)
+        } catch (error) {
+          console.error(`❌ 채팅방 ${roomId} 삭제 실패:`, error)
+          alert("채팅방 삭제에 실패했습니다.")
+        }
+      }
+    },
+    [deleteRoom, selectedRoomId],
+  )
+
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[99999]"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) {
+          onClose()
+          setHasAttemptedRoomCreation(false) // 🔧 모달 닫을 때 상태 초기화
+        }
       }}
     >
       <div
@@ -226,17 +272,8 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
                   <span className="ml-2 text-sm font-normal opacity-60">({selectedRoom.chatroomId}번 방)</span>
                   {/* 🔧 연결 상태 표시 추가 */}
                   <div className="flex items-center gap-2 ml-3">
-                    
-                  <StatusIndicator 
+                    <StatusIndicator status="online" size="sm" animate />
 
-                      status="online" 
-
-                      size="sm" 
-
-                      animate 
-
-                      />
-                    
                     <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                       {isConnected ? "연결됨" : "연결 안됨"}
                     </span>
@@ -249,7 +286,10 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
           </div>
 
           <button
-            onClick={onClose}
+            onClick={() => {
+              onClose()
+              setHasAttemptedRoomCreation(false) // 🔧 모달 닫을 때 상태 초기화
+            }}
             className={`p-2 rounded-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${
               isDarkMode ? "bg-white/10 hover:bg-white/20 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-700"
             } z-10`}
@@ -331,20 +371,21 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
                                 : "bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500"
                             }`}
                           >
-                            {profile.profileImage ? (
-                                    <img
-                                      src={profile.profileImage}
-                                      alt="프로필 사진"
-                                      className="w-full h-full object-cover"
-                                    />
-                                    ) : (
-                                    <div
-                                      className={`w-full h-full rounded-full flex items-center justify-center ${
-                                        isDarkMode ? "bg-gray-800" : "bg-white"
-                                      }`}>
-                                      <User size={18} className={isDarkMode ? "text-gray-300" : "text-gray-600"} />
-                                    </div>
-                                    )}
+                            {room.opponentProfileImageUrl ? ( // room.opponentProfileImageUrl 사용
+                              <img
+                                src={room.opponentProfileImageUrl || "/placeholder.svg"}
+                                alt="프로필이미지"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className={`w-full h-full rounded-full flex items-center justify-center ${
+                                  isDarkMode ? "bg-gray-800" : "bg-white"
+                                }`}
+                              >
+                                <User size={18} className={isDarkMode ? "text-gray-300" : "text-gray-600"} />
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -360,7 +401,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
 
                           <div className="flex items-center justify-between mt-1">
                             <p className={`text-sm truncate ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                              {room.lastMessage || "새로운 매칭이 생성되었습니다!"}
+                              {room.lastMessage || "새로운 채팅이 생성되었습니다!"}
                             </p>
                             {(room.unreadCount ?? 0) > 0 && (
                               <span className="min-w-[20px] h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center px-1">
@@ -369,6 +410,15 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose, initialRoomId, s
                             )}
                           </div>
                         </div>
+                        <button
+                          onClick={(e) => handleDeleteRoom(room.chatroomId, e)}
+                          className={`ml-2 p-2 rounded-full transition-all duration-200 ${
+                            isDarkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                          }`}
+                          aria-label={`채팅방 ${opp.name} 삭제`}
+                        >
+                          <Trash2 size={18} className={isDarkMode ? "text-gray-400" : "text-gray-500"} />
+                        </button>
                       </div>
                     </div>
                   )

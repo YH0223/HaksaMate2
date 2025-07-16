@@ -4,6 +4,7 @@ import com.mega.haksamate.dto.ChatRoomRequestDTO;
 import com.mega.haksamate.dto.ChatRoomResponseDTO;
 import com.mega.haksamate.dto.ChatRoomWithLastMessageDTO;
 import com.mega.haksamate.entity.ChatRoom;
+import com.mega.haksamate.service.ChatMessageService;
 import com.mega.haksamate.service.ChatRoomService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 public class ChatRoomController {
 
     private final ChatRoomService chatRoomService;
+    private final ChatMessageService chatMessageService;
 
     @PostMapping
     public ResponseEntity<ChatRoomResponseDTO> createChatRoom(@RequestBody ChatRoomRequestDTO request) {
@@ -55,5 +57,13 @@ public class ChatRoomController {
     public ResponseEntity<Void> deleteChatRoom(@PathVariable Long chatRoomId) {
         chatRoomService.deleteChatRoom(chatRoomId);
         return ResponseEntity.noContent().build();
+    }
+    @PutMapping("/{roomId}/read")
+    public ResponseEntity<Void> markMessagesAsRead(
+            @PathVariable Long roomId,
+            @RequestParam UUID userId // 현재 접속한 사용자
+    ) {
+        chatRoomService.markAsRead(roomId, userId);
+        return ResponseEntity.ok().build();
     }
 }

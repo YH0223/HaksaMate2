@@ -5,6 +5,7 @@ import com.mega.haksamate.dto.ChatRoomWithLastMessageDTO;
 import com.mega.haksamate.entity.ChatMessage;
 import com.mega.haksamate.entity.ChatRoom;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -20,11 +21,20 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     ChatMessage findTop1ByChatRoomOrderBySentAtDesc(ChatRoom chatRoom);
 
     @Query("""
-SELECT COUNT(m) FROM ChatMessage m
-WHERE m.chatRoom.chatRoomId = :chatRoomId
-  AND m.sender.id <> :myUserId
-  AND (m.isRead = false OR m.isRead IS NULL)
-""")
+            SELECT COUNT(m) FROM ChatMessage m
+            WHERE m.chatRoom.chatRoomId = :chatRoomId
+              AND m.sender.id <> :myUserId
+              AND (m.isRead = false OR m.isRead IS NULL)
+            """)
     int countUnreadByChatRoomAndUser(@Param("chatRoomId") Long chatRoomId, @Param("myUserId") UUID myUserId);
 
+    @Modifying
+    @Query("""
+            UPDATE ChatMessage m
+            SET m.isRead = true
+            WHERE m.chatRoom.chatRoomId = :chatRoomId
+              AND m.sender.id <> :myUserId
+              AND m.isRead = false
+        """)
+    void markMessagesAsRead(@Param("chatRoomId") Long chatRoomId, @Param("myUserId") UUID myUserId);
 }

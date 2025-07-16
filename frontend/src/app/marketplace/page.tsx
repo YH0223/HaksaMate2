@@ -2,6 +2,8 @@
 
 import type React from "react"
 import { useState, useCallback, useEffect } from "react"
+import { AuthGuard } from "@/components/AuthGuard"
+import { useAuth } from "@/hooks/useAuth"
 import Sidebar from "../sidebar/sidebar"
 import ProductCard from "./components/ProductCard"
 import CategoryFilter from "./components/CategoryFilter"
@@ -13,16 +15,15 @@ import EditProductModal from "./components/EditProductModal"
 import ChatModal from "@/components/ChatModal"
 import AnimatedBackground from "../matching/components/AnimatedBackground"
 import { useMarketplace } from "./hooks/useMarketplace"
-import { useAuth } from "@/hooks/useAuth"
 import type { Product, SearchFilters } from "./types"
 import ReportModal from "./components/ReportModal"
 import { useTransactions } from "./hooks/useTransactions"
-import {useReports} from "./hooks/useReports"
+import { useReports } from "./hooks/useReports"
 import { useKakaoMap } from "@/hooks/useKakaoMap"
-import { ProfileModal } from "../components/ProfileModal"
 import { OtherProfileModal } from "../components/OthersProfileModal"
 
-const MarketplacePage: React.FC = () => {
+function MarketplacePageContent() {
+  const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -39,7 +40,6 @@ const MarketplacePage: React.FC = () => {
   const [showChat, setShowChat] = useState(false)
   const [chatSellerId, setChatSellerId] = useState<string | null>(null)
   const { createReport } = useReports()
-  const { user, isLoading} = useAuth()
   const {
     products,
     isMarketplaceLoading,
@@ -67,38 +67,43 @@ const MarketplacePage: React.FC = () => {
   }
 
   const handleStartChatFromProfile = (sellerId: string) => {
-  // ChatModal은 OtherProfileModal 닫힌 뒤 띄움
-  setTimeout(() => {
-    setChatSellerId(sellerId)
-    setShowChat(true)
-  }, 300) // react-modal transition 시간 고려해서 약간 딜레이
-}
+    // ChatModal은 OtherProfileModal 닫힌 뒤 띄움
+    setTimeout(() => {
+      setChatSellerId(sellerId)
+      setShowChat(true)
+    }, 300) // react-modal transition 시간 고려해서 약간 딜레이
+  }
+
   // 초기 상품 로드
   useEffect(() => {
-    console.log("🧑 현재 사용자 ID:", user?.id)
+    if (!user?.id) return
+
+    console.log("🧑 현재 사용자 ID:", user.id)
     const filters: SearchFilters = {
       category: selectedCategory,
       sortBy: "latest",
     }
-    loadProducts(user?.id,filters)
-  }, [user,isLoading, selectedCategory, loadProducts])
+    loadProducts(user.id, filters)
+  }, [user?.id, selectedCategory, loadProducts])
 
   // 검색 처리
   useEffect(() => {
+    if (!user?.id) return
+
     if (searchQuery.trim()) {
       const filters: SearchFilters = {
         category: selectedCategory,
         sortBy: "latest",
       }
-      searchProducts(user?.id,searchQuery, filters)
+      searchProducts(user.id, searchQuery, filters)
     } else {
       const filters: SearchFilters = {
         category: selectedCategory,
         sortBy: "latest",
       }
-      loadProducts(user?.id,filters)
+      loadProducts(user.id, filters)
     }
-  }, [searchQuery, selectedCategory, searchProducts, loadProducts])
+  }, [searchQuery, selectedCategory, user?.id, searchProducts, loadProducts])
 
   const handleLike = useCallback(
     async (productId: number) => {
@@ -110,8 +115,7 @@ const MarketplacePage: React.FC = () => {
       const product = products.find((p) => p.itemid === productId)
       if (!product) return
 
-      toggleLike(productId,user.id)
-
+      toggleLike(productId, user.id)
     },
     [user, products, toggleLike],
   )
@@ -131,7 +135,7 @@ const MarketplacePage: React.FC = () => {
           await createTransaction({
             itemId: product.itemid,
             sellerId: sellerId,
-            buyerId:user?.id
+            buyerId: user.id,
           })
         }
       } catch (error) {
@@ -147,7 +151,7 @@ const MarketplacePage: React.FC = () => {
 
   const handleProductClick = useCallback(
     async (product: Product) => {
-      const enrichedProduct = products.find(p => p.itemid === product.itemid)
+      const enrichedProduct = products.find((p) => p.itemid === product.itemid)
       if (enrichedProduct) {
         setSelectedProduct(enrichedProduct)
       } else {
@@ -156,7 +160,7 @@ const MarketplacePage: React.FC = () => {
         if (fallback) setSelectedProduct(fallback)
       }
     },
-    [products, getProduct]
+    [products, getProduct],
   )
 
   const handleAddProduct = useCallback(() => {
@@ -169,39 +173,43 @@ const MarketplacePage: React.FC = () => {
 
   // 상품 수정 핸들러
   const handleEditProduct = useCallback(() => {
+    if (!user?.id) return
+
     const filters: SearchFilters = {
       category: selectedCategory,
       sortBy: "latest",
     }
-  
-    loadProducts(user?.id, filters)
+
+    loadProducts(user.id, filters)
     setShowEditProduct(false)
     setEditingProduct(null)
     setSelectedProduct(null)
-  }, [selectedCategory, loadProducts, user])
+  }, [selectedCategory, loadProducts, user?.id])
 
   // 상품 삭제 핸들러
   const handleDeleteProduct = useCallback(
     async (productId: number) => {
+      if (!user?.id) return
+
       try {
         await deleteProduct(productId)
         alert("상품이 삭제되었습니다.")
-  
+
         // 상태 초기화
         setSelectedProduct(null)
         setEditingProduct(null)
-  
+
         // 목록 새로고침
         const filters: SearchFilters = {
           category: selectedCategory,
           sortBy: "latest",
         }
-        loadProducts(user?.id, filters)
+        loadProducts(user.id, filters)
       } catch (error) {
         alert("상품 삭제에 실패했습니다.")
       }
     },
-    [deleteProduct, selectedCategory, user, loadProducts]
+    [deleteProduct, selectedCategory, user?.id, loadProducts],
   )
 
   // 상품 상태 변경 핸들러
@@ -223,6 +231,7 @@ const MarketplacePage: React.FC = () => {
     },
     [updateProductStatus],
   )
+
   const handleReportSubmit = async (reportData: any) => {
     try {
       await createReport(reportData)
@@ -232,6 +241,7 @@ const MarketplacePage: React.FC = () => {
       throw error
     }
   }
+
   // 거래 완료 핸들러
   const handleCompleteTransaction = useCallback(
     async (productId: number) => {
@@ -255,25 +265,17 @@ const MarketplacePage: React.FC = () => {
   }, [])
 
   const handleProductAdded = useCallback(() => {
+    if (!user?.id) return
+
     // 상품 등록 후 목록 새로고침
     const filters: SearchFilters = {
       category: selectedCategory,
       sortBy: "latest",
     }
-    loadProducts(user?.id,filters)
-    setShowAddProduct(false)
-  }, [selectedCategory, loadProducts])
-
-  useEffect(() => {
-    if (!user?.id || isLoading) return;
-  
-    const filters: SearchFilters = {
-      category: selectedCategory,
-      sortBy: "latest",
-    }
     loadProducts(user.id, filters)
-  }, [user?.id, isLoading, selectedCategory, loadProducts])
-  
+    setShowAddProduct(false)
+  }, [selectedCategory, loadProducts, user?.id])
+
   return (
     <>
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
@@ -293,10 +295,10 @@ const MarketplacePage: React.FC = () => {
           onAddProduct={handleAddProduct}
           onOpenChat={() => {
             setShowChat(true)
-            setChatSellerId(user?.id??null) // seller 지정 없이 열기
+            setChatSellerId(user?.id ?? null) // seller 지정 없이 열기
           }}
         />
-      
+
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-8 pb-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* 사이드바 (데스크톱) */}
@@ -352,7 +354,7 @@ const MarketplacePage: React.FC = () => {
                 )}
 
                 {/* 에러 상태 */}
-                {isMarketplaceLoading && (
+                {error && (
                   <div className="text-center py-16">
                     <div className="text-red-500 text-lg">{error}</div>
                   </div>
@@ -384,6 +386,7 @@ const MarketplacePage: React.FC = () => {
                           isDarkMode={isDarkMode}
                           onProfileClick={handleProfileClick}
                         />
+
                       </div>
                     ))}
                   </div>
@@ -449,7 +452,7 @@ const MarketplacePage: React.FC = () => {
         />
       )}
 
-      {showChat &&  (
+      {showChat && (
         <ChatModal
           isOpen={showChat}
           onClose={() => {
@@ -458,7 +461,7 @@ const MarketplacePage: React.FC = () => {
           }}
           sellerId={chatSellerId}
           isDarkMode={isDarkMode}
-        />  
+        />
       )}
 
       {showReportModal && reportingProduct && (
@@ -488,7 +491,7 @@ const MarketplacePage: React.FC = () => {
         />
       )}
 
-      <style jsx>{ `
+      <style jsx>{`
         @keyframes slideInUp {
           from {
             opacity: 0;
@@ -504,4 +507,13 @@ const MarketplacePage: React.FC = () => {
   )
 }
 
+const MarketplacePage: React.FC = () => {
+  return (
+    <AuthGuard>
+      <MarketplacePageContent />
+    </AuthGuard>
+  )
+}
+
 export default MarketplacePage
+

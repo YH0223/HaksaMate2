@@ -1,8 +1,9 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { useAuth } from '@/hooks/useAuth'
-import { fetchProfile } from '@/lib/profile'
+import type React from "react"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { useAuth } from "@/hooks/useAuth"
+import { fetchProfile } from "@/lib/profile"
 
 interface ProfileData {
   name: string
@@ -27,19 +28,22 @@ interface GlobalProfileProviderProps {
 }
 
 export const GlobalProfileProvider: React.FC<GlobalProfileProviderProps> = ({ children }) => {
-  const { user } = useAuth()
+  const { user, isInitialized } = useAuth()
   const [profile, setProfile] = useState<ProfileData>({
     name: "",
     email: "",
     department: "",
     studentId: "",
     year: "",
-    profileImage: undefined
+    profileImage: undefined,
   })
   const [isLoading, setIsLoading] = useState(true)
 
   const refreshProfile = async () => {
-    if (!user?.id) return
+    if (!user?.id) {
+      setIsLoading(false)
+      return
+    }
 
     try {
       setIsLoading(true)
@@ -50,41 +54,50 @@ export const GlobalProfileProvider: React.FC<GlobalProfileProviderProps> = ({ ch
         department: data.department || "",
         studentId: data.student_id || "",
         year: data.year || "",
-        profileImage: data.profile_image_url || undefined
+        profileImage: data.profile_image_url || undefined,
       })
     } catch (error) {
-      console.error('프로필 정보 가져오기 실패:', error)
+      console.error("프로필 정보 가져오기 실패:", error)
+      // 기본값 유지
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    if (user?.id) {
-      refreshProfile()
-    } else {
-      setIsLoading(false)
+    // 인증이 초기화되고 사용자 정보가 있을 때만 프로필 로드
+    if (isInitialized) {
+      if (user?.id) {
+        refreshProfile()
+      } else {
+        // 사용자가 없으면 프로필 초기화
+        setProfile({
+          name: "",
+          email: "",
+          department: "",
+          studentId: "",
+          year: "",
+          profileImage: undefined,
+        })
+        setIsLoading(false)
+      }
     }
-  }, [user])
+  }, [user?.id, isInitialized])
 
   const value: GlobalProfileContextType = {
     profile,
     setProfile,
     isLoading,
-    refreshProfile
+    refreshProfile,
   }
 
-  return (
-    <GlobalProfileContext.Provider value={value}>
-      {children}
-    </GlobalProfileContext.Provider>
-  )
+  return <GlobalProfileContext.Provider value={value}>{children}</GlobalProfileContext.Provider>
 }
 
 export const useGlobalProfile = () => {
   const context = useContext(GlobalProfileContext)
   if (context === undefined) {
-    throw new Error('useGlobalProfile must be used within a GlobalProfileProvider')
+    throw new Error("useGlobalProfile must be used within a GlobalProfileProvider")
   }
   return context
-} 
+}

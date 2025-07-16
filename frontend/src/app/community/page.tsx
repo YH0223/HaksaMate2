@@ -1,52 +1,29 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo } from "react"
-import {
-  MessageSquare,
-  Users,
-  Hash,
-  MessageCircle,
-  Share,
-  Trash2,
-  Plus,
-  TrendingUp,
-  FlameIcon as Fire,
-  Heart,
-  Send,
-  ImageIcon,
-  Smile,
-  MoreHorizontal,
-  Search,
-  Bell,
-  Bookmark,
-  X,
-} from "lucide-react"
+import { MessageSquare, Plus, FlameIcon as Fire, Heart } from "lucide-react"
 import Sidebar from "../sidebar/sidebar"
 import {
   fetchPosts,
   createPost,
   deletePost,
-  fetchUserLikedPostIds,
   likePost,
   unlikePost,
   fetchComments,
   createComment,
   deleteComment,
 } from "@/lib/community"
-import { supabase } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation"
-import { Post, Comment } from "./types"
+import type { Post, Comment } from "./types"
 import { PostCard } from "./components/PostCard"
 import { CommunityHeader } from "./components/CommunityHeader"
 import { RightSidebar } from "./components/RightSidebar"
 import { NewPostModal } from "./components/NewPostModal"
 import { NotificationsPanel } from "./components/NotificationsPanel"
-import { MockDataFactory, type MockUser } from '@/lib/mockData'
-import { StatusIndicator } from '@/components/ui/StatusIndicator'
-import { useGlobalProfile } from '@/components/GlobalProfileProvider'
+import { useGlobalProfile } from "@/components/GlobalProfileProvider"
 import ChatModal from "@/components/ChatModal"
 import { OtherProfileModal } from "../components/OthersProfileModal"
-import {useAuth} from "@/hooks/useAuth"
+import { useAuth } from "@/hooks/useAuth"
 
 // User 타입을 Supabase User와 호환되도록 수정
 interface CommunityUser {
@@ -59,12 +36,10 @@ export default function CommunityPage() {
   const router = useRouter()
   const { profile } = useGlobalProfile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<"all" | "popular" | "following">(
-    "all",
-  )
+  const [activeTab, setActiveTab] = useState<"all" | "popular" | "following">("all")
   const [newPost, setNewPost] = useState("")
   const [posts, setPosts] = useState<Post[]>([])
-  
+
   const [likedPostIds, setLikedPostIds] = useState<number[]>([])
   const [bookmarkedPostIds, setBookmarkedPostIds] = useState<number[]>([])
   const [comments, setComments] = useState<Record<number, Comment[]>>({})
@@ -82,11 +57,8 @@ export default function CommunityPage() {
   const [isPullRefreshing, setIsPullRefreshing] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [startY, setStartY] = useState(0)
-  const { user, isLoading:isAuthLoading } = useAuth()
-  const [
-    notifications,
-    setNotifications,
-  ] = useState<
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const [notifications, setNotifications] = useState<
     Array<{
       id: string
       type: "like" | "comment" | "new_post"
@@ -103,17 +75,55 @@ export default function CommunityPage() {
   const [showChatModal, setShowChatModal] = useState(false)
   const [chatTargetId, setChatTargetId] = useState<string | null>(null)
 
+  // 🔧 채팅 생성 중복 방지를 위한 상태 추가
+  const [isCreatingChat, setIsCreatingChat] = useState(false)
+  const [creatingChatWith, setCreatingChatWith] = useState<string | null>(null)
+
   const handleProfileClick = (userId: string) => {
     if (!user || userId === user.id) return // 내 프로필이면 무시
     setSelectedUserId(userId)
     setShowOtherProfile(true)
   }
-  
-  const handleOpenChat = (targetUserId: string) => {
-    setChatTargetId(targetUserId)
-    setShowChatModal(true)
-  }
-  
+
+  // 🔧 채팅 생성 중복 방지 로직 추가
+  const handleOpenChat = useCallback(
+    (targetUserId: string) => {
+      // 이미 같은 사용자와 채팅을 생성 중이면 무시
+      if (isCreatingChat && creatingChatWith === targetUserId) {
+        console.log("⚠️ 이미 채팅 생성 중:", targetUserId)
+        return
+      }
+
+      // 이미 채팅 모달이 열려있고 같은 사용자면 무시
+      if (showChatModal && chatTargetId === targetUserId) {
+        console.log("⚠️ 이미 채팅 모달이 열려있음:", targetUserId)
+        return
+      }
+
+      console.log("💬 채팅 생성 시작:", targetUserId)
+      setIsCreatingChat(true)
+      setCreatingChatWith(targetUserId)
+      setChatTargetId(targetUserId)
+      setShowChatModal(true)
+
+      // 3초 후 생성 중 상태 해제 (안전장치)
+      setTimeout(() => {
+        setIsCreatingChat(false)
+        setCreatingChatWith(null)
+      }, 3000)
+    },
+    [isCreatingChat, creatingChatWith, showChatModal, chatTargetId],
+  )
+
+  // 🔧 채팅 모달 닫기 시 상태 정리
+  const handleCloseChatModal = useCallback(() => {
+    console.log("💬 채팅 모달 닫기")
+    setShowChatModal(false)
+    setChatTargetId(null)
+    setIsCreatingChat(false)
+    setCreatingChatWith(null)
+  }, [])
+
   // 알림 패널 외부 클릭 감지
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -130,39 +140,34 @@ export default function CommunityPage() {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [showNotifications])
-  
+
   useEffect(() => {
     if (user?.id) {
       loadPosts()
     }
   }, [user?.id])
-  
+
   // 알림 추가 함수
-  const addNotification = useCallback(
-    (type: "like" | "comment" | "new_post", message: string) => {
-      const newNotification = {
-        id: Date.now().toString(),
-        type,
-        message,
-        timestamp: new Date(),
-        read: false,
-      }
+  const addNotification = useCallback((type: "like" | "comment" | "new_post", message: string) => {
+    const newNotification = {
+      id: Date.now().toString(),
+      type,
+      message,
+      timestamp: new Date(),
+      read: false,
+    }
 
-      setNotifications(prev => [newNotification, ...prev].slice(0, 10)) // 최대 10개
-      setUnreadCount(prev => prev + 1)
+    setNotifications((prev) => [newNotification, ...prev].slice(0, 10)) // 최대 10개
+    setUnreadCount((prev) => prev + 1)
 
-      // 3초 후 자동으로 읽음 처리
-      setTimeout(() => {
-        setNotifications(prev =>
-          prev.map(notif =>
-            notif.id === newNotification.id ? { ...notif, read: true } : notif,
-          ),
-        )
-        setUnreadCount(prev => Math.max(0, prev - 1))
-      }, 3000)
-    },
-    [],
-  )
+    // 3초 후 자동으로 읽음 처리
+    setTimeout(() => {
+      setNotifications((prev) =>
+        prev.map((notif) => (notif.id === newNotification.id ? { ...notif, read: true } : notif)),
+      )
+      setUnreadCount((prev) => Math.max(0, prev - 1))
+    }, 3000)
+  }, [])
 
   // WebSocket 시뮬레이션 (실제 환경에서는 실제 WebSocket 사용)
   useEffect(() => {
@@ -170,11 +175,9 @@ export default function CommunityPage() {
 
     const simulateRealTimeEvents = () => {
       const events = [
-        () =>
-          addNotification("like", "누군가가 당신의 게시글에 좋아요를 눌렀습니다! ❤️"),
+        () => addNotification("like", "누군가가 당신의 게시글에 좋아요를 눌렀습니다! ❤️"),
         () => addNotification("comment", "새로운 댓글이 달렸습니다! 💬"),
-        () =>
-          addNotification("new_post", "팔로우한 사용자가 새 글을 작성했습니다! 📝"),
+        () => addNotification("new_post", "팔로우한 사용자가 새 글을 작성했습니다! 📝"),
       ]
 
       // 랜덤한 시간 간격으로 알림 생성 (10-30초)
@@ -194,20 +197,18 @@ export default function CommunityPage() {
 
   // 알림 패널 토글
   const toggleNotifications = useCallback(() => {
-    setShowNotifications(prev => !prev)
+    setShowNotifications((prev) => !prev)
     if (!showNotifications) {
       // 알림 패널 열 때 모든 알림을 읽음 처리
-      setNotifications(prev => prev.map(notif => ({ ...notif, read: true })))
+      setNotifications((prev) => prev.map((notif) => ({ ...notif, read: true })))
       setUnreadCount(0)
     }
   }, [showNotifications])
 
   // 북마크 토글 함수
   const handleBookmark = useCallback((postId: number) => {
-    setBookmarkedPostIds(prev => {
-      const newBookmarks = prev.includes(postId)
-        ? prev.filter(id => id !== postId)
-        : [...prev, postId]
+    setBookmarkedPostIds((prev) => {
+      const newBookmarks = prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]
 
       // 로컬스토리지에 저장
       localStorage.setItem("bookmarkedPosts", JSON.stringify(newBookmarks))
@@ -230,75 +231,64 @@ export default function CommunityPage() {
 
   // 댓글 토글 함수
   const toggleComments = useCallback((postId: number) => {
-    setShowComments(prev => ({
+    setShowComments((prev) => ({
       ...prev,
       [postId]: !prev[postId],
     }))
   }, [])
 
-
-
   // 게시글 로드
-  const loadPosts = useCallback(
-    async (isInitial = true) => {
+  const loadPosts = useCallback(async (isInitial = true) => {
+    if (isInitial) {
+      setIsLoading(true)
+      setPage(1)
+    } else {
+      setIsLoadingMore(true)
+    }
+
+    try {
+      const data = await fetchPosts()
+
       if (isInitial) {
-        setIsLoading(true)
-        setPage(1)
+        setPosts(data)
       } else {
-        setIsLoadingMore(true)
+        // 실제로는 페이지네이션 API가 필요하지만, 현재는 시뮬레이션
+        setPosts((prev) => [...prev, ...data.slice(prev.length, prev.length + 5)])
       }
 
-      try {
-        const data = await fetchPosts()
+      // 댓글 로드 최적화
+      const commentsData: Record<number, Comment[]> = {}
+      await Promise.all(
+        data.map(async (post) => {
+          try {
+            const postComments = await fetchComments(post.id)
+            commentsData[post.id] = postComments
+          } catch (error) {
+            console.error(`Failed to fetch comments for post ${post.id}:`, error)
+            commentsData[post.id] = []
+          }
+        }),
+      )
+      setComments((prev) => ({ ...prev, ...commentsData }))
 
-        if (isInitial) {
-          setPosts(data)
-        } else {
-          // 실제로는 페이지네이션 API가 필요하지만, 현재는 시뮬레이션
-          setPosts(prev => [
-            ...prev,
-            ...data.slice(prev.length, prev.length + 5),
-          ])
-        }
+      // 댓글 숨김 상태 초기화 (기본적으로 모든 댓글 숨김)
+      const initialCommentState: Record<number, boolean> = {}
+      data.forEach((post) => {
+        initialCommentState[post.id] = false
+      })
+      setShowComments((prev) => ({ ...prev, ...initialCommentState }))
 
-        // 댓글 로드 최적화
-        const commentsData: Record<number, Comment[]> = {}
-        await Promise.all(
-          data.map(async post => {
-            try {
-              const postComments = await fetchComments(post.id)
-              commentsData[post.id] = postComments
-            } catch (error) {
-              console.error(
-                `Failed to fetch comments for post ${post.id}:`,
-                error,
-              )
-              commentsData[post.id] = []
-            }
-          }),
-        )
-        setComments(prev => ({ ...prev, ...commentsData }))
-
-        // 댓글 숨김 상태 초기화 (기본적으로 모든 댓글 숨김)
-        const initialCommentState: Record<number, boolean> = {}
-        data.forEach(post => {
-          initialCommentState[post.id] = false
-        })
-        setShowComments(prev => ({ ...prev, ...initialCommentState }))
-
-        // 더 로드할 데이터가 있는지 확인 (실제로는 API 응답에서 확인)
-        if (data.length < 10) {
-          setHasMore(false)
-        }
-      } catch (error) {
-        console.error("Failed to load posts:", error)
-      } finally {
-        setIsLoading(false)
-        setIsLoadingMore(false)
+      // 더 로드할 데이터가 있는지 확인 (실제로는 API 응답에서 확인)
+      if (data.length < 10) {
+        setHasMore(false)
       }
-    },
-    [],
-  )
+    } catch (error) {
+      console.error("Failed to load posts:", error)
+    } finally {
+      setIsLoading(false)
+      setIsLoadingMore(false)
+    }
+  }, [])
 
   // Pull-to-Refresh 함수
   const handlePullRefresh = useCallback(async () => {
@@ -360,13 +350,12 @@ export default function CommunityPage() {
   useEffect(() => {
     const handleScroll = () => {
       if (
-        window.innerHeight + document.documentElement.scrollTop >=
-          document.documentElement.offsetHeight - 1000 &&
+        window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 1000 &&
         hasMore &&
         !isLoadingMore &&
         !isLoading
       ) {
-        setPage(prev => prev + 1)
+        setPage((prev) => prev + 1)
         loadPosts(false)
       }
     }
@@ -426,10 +415,10 @@ export default function CommunityPage() {
       try {
         if (likedPostIds.includes(postId)) {
           await unlikePost(postId, user.id)
-          setLikedPostIds(prev => prev.filter(id => id !== postId))
+          setLikedPostIds((prev) => prev.filter((id) => id !== postId))
         } else {
           await likePost(postId, user.id)
-          setLikedPostIds(prev => [...prev, postId])
+          setLikedPostIds((prev) => [...prev, postId])
         }
         await loadPosts()
       } catch (error) {
@@ -458,10 +447,10 @@ export default function CommunityPage() {
           author_username: profile.name || "사용자",
           content,
         })
-        setNewComment(prev => ({ ...prev, [postId]: "" }))
+        setNewComment((prev) => ({ ...prev, [postId]: "" }))
 
         const postComments = await fetchComments(postId)
-        setComments(prev => ({ ...prev, [postId]: postComments }))
+        setComments((prev) => ({ ...prev, [postId]: postComments }))
         await loadPosts()
       } catch (error) {
         console.error("Failed to add comment:", error)
@@ -479,7 +468,7 @@ export default function CommunityPage() {
       try {
         await deleteComment(commentId, user.id)
         const postComments = await fetchComments(postId)
-        setComments(prev => ({ ...prev, [postId]: postComments }))
+        setComments((prev) => ({ ...prev, [postId]: postComments }))
         await loadPosts()
       } catch (error) {
         console.error("Failed to delete comment:", error)
@@ -491,10 +480,8 @@ export default function CommunityPage() {
 
   // 필터링된 게시글 - 인기글 로직 추가
   const filteredPosts = useMemo(() => {
-    let filtered = posts.filter(post =>
-      searchQuery
-        ? post.content.toLowerCase().includes(searchQuery.toLowerCase())
-        : true,
+    let filtered = posts.filter((post) =>
+      searchQuery ? post.content.toLowerCase().includes(searchQuery.toLowerCase()) : true,
     )
 
     // 탭에 따른 정렬
@@ -505,18 +492,12 @@ export default function CommunityPage() {
       })
     } else if (activeTab === "following") {
       // 좋아요: 내가 좋아요 누른 게시글만 표시
-      filtered = filtered.filter(post => likedPostIds.includes(post.id))
+      filtered = filtered.filter((post) => likedPostIds.includes(post.id))
       // 최신순으로 정렬
-      filtered = filtered.sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      )
+      filtered = filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     } else {
       // 전체: 최신순
-      filtered = filtered.sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      )
+      filtered = filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
 
     return filtered
@@ -540,15 +521,11 @@ export default function CommunityPage() {
         <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
         {/* 메인 컨텐츠 영역 - 레이아웃 개선 */}
-        <div
-          className={`flex-1 transition-all duration-300 ease-out ${
-            sidebarOpen ? "md:ml-[280px]" : "ml-0"
-          }`}
-        >
+        <div className={`flex-1 transition-all duration-300 ease-out ${sidebarOpen ? "md:ml-[280px]" : "ml-0"}`}>
           {/* Pull-to-Refresh 인디케이터 */}
           <div
             className="md:hidden fixed top-0 left-0 right-0 z-50 flex justify-center transition-transform duration-300 ease-out"
-            style={{ 
+            style={{
               transform: `translateY(${pullDistance - 60}px)`,
               opacity: pullDistance > 20 ? 1 : 0,
             }}
@@ -557,9 +534,7 @@ export default function CommunityPage() {
               {isPullRefreshing ? (
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 border-2 border-blue-200 dark:border-blue-300 border-t-blue-500 dark:border-t-blue-400 rounded-full animate-spin"></div>
-                  <span className="text-sm text-slate-600 dark:text-slate-300 font-medium">
-                    새로고침 중...
-                  </span>
+                  <span className="text-sm text-slate-600 dark:text-slate-300 font-medium">새로고침 중...</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
@@ -571,9 +546,7 @@ export default function CommunityPage() {
                     ↓
                   </div>
                   <span className="text-sm text-slate-600 dark:text-slate-300 font-medium">
-                    {pullDistance > 60
-                      ? "놓아서 새로고침"
-                      : "아래로 당겨서 새로고침"}
+                    {pullDistance > 60 ? "놓아서 새로고침" : "아래로 당겨서 새로고침"}
                   </span>
                 </div>
               )}
@@ -619,14 +592,14 @@ export default function CommunityPage() {
                           activeTab === "all"
                             ? "4px"
                             : activeTab === "popular"
-                            ? "calc(33.333% + 1px)"
-                            : "calc(66.666% - 2px)",
+                              ? "calc(33.333% + 1px)"
+                              : "calc(66.666% - 2px)",
                         width: "calc(33.333% - 2px)",
                       }}
                     />
 
                     <nav className="relative flex w-full md:w-auto">
-                      {(["all", "popular", "following"] as const).map(tab => (
+                      {(["all", "popular", "following"] as const).map((tab) => (
                         <button
                           key={tab}
                           onClick={() => setActiveTab(tab)}
@@ -642,27 +615,15 @@ export default function CommunityPage() {
                             }`}
                           >
                             {tab === "all" && (
-                              <span
-                                className={`text-xs font-bold ${
-                                  activeTab === tab ? "text-blue-600" : ""
-                                }`}
-                              >
+                              <span className={`text-xs font-bold ${activeTab === tab ? "text-blue-600" : ""}`}>
                                 All
                               </span>
                             )}
                             {tab === "popular" && (
-                              <Fire
-                                className={`w-4 h-4 ${
-                                  activeTab === tab ? "text-orange-500" : ""
-                                }`}
-                              />
+                              <Fire className={`w-4 h-4 ${activeTab === tab ? "text-orange-500" : ""}`} />
                             )}
                             {tab === "following" && (
-                              <Heart
-                                className={`w-4 h-4 ${
-                                  activeTab === tab ? "text-red-500" : ""
-                                }`}
-                              />
+                              <Heart className={`w-4 h-4 ${activeTab === tab ? "text-red-500" : ""}`} />
                             )}
                           </div>
                           <span className="hidden sm:inline">
@@ -727,9 +688,7 @@ export default function CommunityPage() {
                       <div className="relative mx-auto w-8 h-8">
                         <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
                       </div>
-                      <p className="mt-3 text-slate-500 text-sm">
-                        게시글을 불러오는 중...
-                      </p>
+                      <p className="mt-3 text-slate-500 text-sm">게시글을 불러오는 중...</p>
                     </div>
                   </div>
                 ) : filteredPosts.length === 0 ? (
@@ -738,18 +697,14 @@ export default function CommunityPage() {
                       <MessageSquare className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                     </div>
                     <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                      {searchQuery
-                        ? "검색 결과가 없습니다"
-                        : "아직 게시글이 없습니다"}
+                      {searchQuery ? "검색 결과가 없습니다" : "아직 게시글이 없습니다"}
                     </h3>
                     <p className="text-slate-600 dark:text-slate-400">
-                      {searchQuery
-                        ? "다른 키워드로 검색해보세요"
-                        : "첫 번째 게시글을 작성해보세요!"}
+                      {searchQuery ? "다른 키워드로 검색해보세요" : "첫 번째 게시글을 작성해보세요!"}
                     </p>
                   </div>
                 ) : (
-                  filteredPosts.map(post => (
+                  filteredPosts.map((post) => (
                     <PostCard
                       key={post.id}
                       post={post}
@@ -760,17 +715,13 @@ export default function CommunityPage() {
                       areCommentsVisible={!!showComments[post.id]}
                       commentsForPost={comments[post.id] || []}
                       newComment={newComment[post.id] || ""}
-                      onNewCommentChange={value =>
-                        setNewComment(prev => ({ ...prev, [post.id]: value }))
-                      }
+                      onNewCommentChange={(value) => setNewComment((prev) => ({ ...prev, [post.id]: value }))}
                       onLike={() => handleLike(post.id)}
                       onBookmark={() => handleBookmark(post.id)}
                       onToggleComments={() => toggleComments(post.id)}
                       onDelete={() => handleDeletePost(post.id)}
                       onAddComment={() => handleAddComment(post.id)}
-                      onDeleteComment={commentId =>
-                        handleDeleteComment(commentId, post.id)
-                      }
+                      onDeleteComment={(commentId) => handleDeleteComment(commentId, post.id)}
                       onProfileClick={handleProfileClick}
                     />
                   ))
@@ -782,9 +733,7 @@ export default function CommunityPage() {
                     <div className="relative mx-auto w-8 h-8">
                       <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
                     </div>
-                    <p className="mt-3 text-slate-500 text-sm">
-                      더 많은 게시글을 불러오는 중...
-                    </p>
+                    <p className="mt-3 text-slate-500 text-sm">더 많은 게시글을 불러오는 중...</p>
                   </div>
                 )}
 
@@ -794,9 +743,7 @@ export default function CommunityPage() {
                     <div className="w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-4">
                       <MessageSquare className="w-8 h-8 text-slate-400" />
                     </div>
-                    <p className="text-slate-500 text-sm">
-                      모든 게시글을 확인했습니다! 🎉
-                    </p>
+                    <p className="text-slate-500 text-sm">모든 게시글을 확인했습니다! 🎉</p>
                   </div>
                 )}
               </div>
@@ -831,30 +778,22 @@ export default function CommunityPage() {
           />
         )}
 
-      {showOtherProfile && selectedUserId && (
-        <OtherProfileModal
-          showProfileModal={showOtherProfile}
-          targetUserId={selectedUserId}
-          onClose={() => setShowOtherProfile(false)}
-          onStartChat={() => {
-            setChatTargetId(selectedUserId)
-            setShowOtherProfile(false)
-            setShowChatModal(true)
-          }}
-        />
-      )}
+        {showOtherProfile && selectedUserId && (
+          <OtherProfileModal
+            showProfileModal={showOtherProfile}
+            targetUserId={selectedUserId}
+            onClose={() => setShowOtherProfile(false)}
+            onStartChat={() => {
+              handleOpenChat(selectedUserId)
+              setShowOtherProfile(false)
+            }}
+          />
+        )}
 
-      {showChatModal && chatTargetId && (
-        <ChatModal
-          isOpen={showChatModal}
-          sellerId={chatTargetId}
-          onClose={() => {
-            setShowChatModal(false)
-            setChatTargetId(null)
-          }}
-          isDarkMode={false} // 혹은 isDarkMode 상태가 있다면 반영
-        />
-      )}
+        {/* 🔧 채팅 모달 - 중복 생성 방지 로직 적용 */}
+        {showChatModal && chatTargetId && (
+          <ChatModal isOpen={showChatModal} sellerId={chatTargetId} onClose={handleCloseChatModal} isDarkMode={false} />
+        )}
       </div>
     </div>
   )

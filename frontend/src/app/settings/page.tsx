@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Sidebar from "../sidebar/sidebar"
 import { useAuth } from "@/hooks/useAuth"
+import { AuthGuard } from "@/components/AuthGuard"
 import {
   Bell,
   User,
@@ -24,7 +25,7 @@ import {
 import { fetchProfile, updateProfile } from "@/lib/profile"
 import { supabase } from "@/lib/supabaseClient"
 
-export default function SettingsPage() {
+export function SettingsPage() {
   const router = useRouter()
   const { user, isLoading } = useAuth()
   const [activeTab, setActiveTab] = useState("profile")
@@ -890,5 +891,12 @@ export default function SettingsPage() {
           {/* 프로필 모달 삭제됨 */}
         </div>
       </div>
+  )
+}
+export default function Page() {
+  return (
+    <AuthGuard>
+      <SettingsPage />
+    </AuthGuard>
   )
 }

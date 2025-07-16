@@ -103,4 +103,9 @@ public class ChatRoomService {
         chatMessageRepository.deleteAllByChatRoom_ChatRoomId(chatRoomId);
         chatRoomRepository.delete(chatRoom);
     }
+
+    @Transactional
+    public void markAsRead(Long chatRoomId, UUID userId) {
+        chatMessageRepository.markMessagesAsRead(chatRoomId, userId);
+    }
 }
