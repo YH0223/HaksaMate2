@@ -4,8 +4,7 @@ import { useState, useCallback } from "react"
 import type { Transaction, CreateTransactionRequest, Product } from "../types"
 import type { ChatRoom } from "@/app/matching/types"
 import {useChat,useChatRooms}from "@/hooks/useChat"
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
-
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
 export const useTransactions = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(false)

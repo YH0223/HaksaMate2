@@ -33,8 +33,8 @@ public class ItemService {
     @PersistenceContext
     private EntityManager em;
 
-    private final String UPLOAD_DIR = "./frontend/public/uploads";
-    private final String THUMBNAIL_DIR = "./frontend/public/uploads/thumbnails";
+    private final String UPLOAD_DIR = "/home/ubuntu/hmfront/public/uploads";
+    private final String THUMBNAIL_DIR = "/home/ubuntu/hmfront/public/uploads/thumbnails";
 
     public Item getItemById(Long id) {
         return itemRepository.findById(id)

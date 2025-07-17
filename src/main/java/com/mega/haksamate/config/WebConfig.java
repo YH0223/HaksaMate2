@@ -14,8 +14,14 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("http://localhost:3000")  // 허용할 프론트 주소
-                .allowedMethods("*");                     // 모든 메서드 허용
+                .allowedOrigins(
+                        "http://localhost:3000",
+                        "http://15.165.198.124:3000",
+                        "https://haksamate.shop",
+                        "https://www.haksamate.shop"
+                )
+                .allowedMethods("*")
+                .allowCredentials(true); // 쿠키/인증 허용 시 필요
     }
 
     // 정적 리소스(파일) 경로 설정

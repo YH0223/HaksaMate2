@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
-
+const BASE_URL=process.env.NEXT_PUBLIC_API_URL
 export function useSearch() {
   const [searchHistory, setSearchHistory] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -14,7 +14,7 @@ export function useSearch() {
 
     try {
       setIsLoading(true)
-      const response = await fetch(`http://localhost:8080/api/search-history/${user.id}`,{
+      const response = await fetch(`${BASE_URL}/api/search-history/${user.id}`,{
         method:'POST'
       })
       if (response.ok) {
@@ -34,7 +34,7 @@ export function useSearch() {
       if (!user?.id || !keyword.trim()) return
 
       try {
-        await fetch("http://localhost:8080/api/search-history", {
+        await fetch(`${BASE_URL}/api/search-history`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -62,7 +62,7 @@ export function useSearch() {
 
       try {
         await fetch(
-          `http://localhost:8080/api/search-history/${user.id}/keyword?keyword=${encodeURIComponent(keyword)}`,
+          `${BASE_URL}/api/search-history/${user.id}/keyword?keyword=${encodeURIComponent(keyword)}`,
           {
             method: "DELETE",
           },
@@ -81,7 +81,7 @@ export function useSearch() {
     if (!user?.id) return
 
     try {
-      await fetch(`http://localhost:8080/api/search-history/${user.id}`, {
+      await fetch(`${BASE_URL}/search-history/${user.id}`, {
         method: "DELETE",
       })
 

@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react"
 import type { CreateReportRequest } from "../types"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
 
 export const useReports = () => {
   const [isLoading, setIsLoading] = useState(false)

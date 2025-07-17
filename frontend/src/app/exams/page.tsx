@@ -18,6 +18,7 @@ import {
   deleteChecklistItem,
   type Exam,
   type ChecklistItem,
+  fetchChecklistCounts
 } from "@/lib/examApi"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -41,7 +42,16 @@ export default function ExamsPage() {
   })
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [checklistCounts, setChecklistCounts] = useState<Record<number, { total: number; completed: number }>>({})
 
+  useEffect(() => {
+    if (!userId) return
+    const loadChecklistCounts = async () => {
+      const summary = await fetchChecklistCounts(userId)
+      setChecklistCounts(summary)
+    }
+    loadChecklistCounts()
+  }, [userId])
   useEffect(() => {
     const check = async () => {
       const {
@@ -260,8 +270,8 @@ export default function ExamsPage() {
                       className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center transition-colors flex-1"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      체크리스트 ({checklist.filter((item) => item.completed && item.exam_id === exam.id).length}/
-                      {checklist.filter((item) => item.exam_id === exam.id).length})
+                      체크리스트 ({checklistCounts[exam.id]?.completed ?? 0}/{checklistCounts[exam.id]?.total ?? 0})
+                      
                     </button>
                     <div className="flex gap-2">
                       <button

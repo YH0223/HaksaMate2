@@ -5,7 +5,7 @@ import type { Product, CreateProductRequest, UpdateProductRequest, SearchFilters
 import { supabase } from "@/lib/supabaseClient"
 import {useAuth} from "@/hooks/useAuth"
 import {fetchProfile} from "@/lib/profile"
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
 
 export const useMarketplace = () => {
   const [products, setProducts] = useState<Product[]>([])

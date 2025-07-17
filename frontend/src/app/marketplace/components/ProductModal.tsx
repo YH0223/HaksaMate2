@@ -625,13 +625,13 @@ const ProductModal: React.FC<ProductModalProps> = ({
                         currentImageIndex === index ? "border-blue-500" : "border-gray-200 dark:border-gray-600"
                       }`}
                     >
-                      <Image
-                        src={image || "/placeholder.svg"}
-                        alt={`${product.name || product.title} ${index + 1}`}
-                        width={64}
-                        height={64}
-                        className="object-cover"
-                      />
+                        <img
+                          src={`${image}`}
+                          alt="..."
+                          width={64}
+                          height={64}
+                          className="object-cover"
+                        />
                     </button>
                   ))}
                 </div>

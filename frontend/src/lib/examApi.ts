@@ -112,7 +112,33 @@ export const deleteExam = async (id: number, userId: string): Promise<void> => {
         throw error
     }
 }
-
+export const fetchChecklistCounts = async (userId: string): Promise<Record<number, { total: number; completed: number }>> => {
+    try {
+      const { data, error } = await supabase
+        .from(CHECKLIST_TABLE)
+        .select("exam_id, completed")
+        .eq("user_id", userId)
+  
+      if (error) {
+        throw error
+      }
+  
+      const summary = (data || []).reduce((acc, item) => {
+        const examId = item.exam_id
+        if (!acc[examId]) {
+          acc[examId] = { total: 0, completed: 0 }
+        }
+        acc[examId].total += 1
+        if (item.completed) acc[examId].completed += 1
+        return acc
+      }, {} as Record<number, { total: number; completed: number }>)
+  
+      return summary
+    } catch (error) {
+      console.error("Error fetching checklist summary:", error)
+      throw error
+    }
+  }
 // 체크리스트 조회
 export const fetchChecklist = async (userId: string, examId: number): Promise<ChecklistItem[]> => {
     try {

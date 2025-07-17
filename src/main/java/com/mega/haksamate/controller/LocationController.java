@@ -10,7 +10,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/location")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000")
 public class LocationController {
 
     private final LocationService locationService;

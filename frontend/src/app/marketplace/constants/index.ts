@@ -15,7 +15,7 @@ export const TRANSACTION_STATUS = {
 
 export const REPORT_REASONS = ["부적절한 내용", "스팸/광고", "사기 의심", "기타"] as const
 
-export const BASE_URL = "http://localhost:8080"
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
 // 카테고리별 아이콘과 개수 정보
 export const CATEGORY_INFO = [

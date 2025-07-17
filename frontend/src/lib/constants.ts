@@ -126,7 +126,7 @@ export const THEME_COLORS = {
   // ===============================
   
   export const API_CONFIG = {
-    baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080',
+    baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
     timeout: 10000,
     retryAttempts: 3,
     retryDelay: 1000

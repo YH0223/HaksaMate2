@@ -3,8 +3,7 @@
 import { useState, useCallback } from "react"
 import type { Review, CreateReviewRequest } from "../types"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
-
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
 export const useReviews = () => {
   const [reviews, setReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(false)

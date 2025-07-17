@@ -1,6 +1,5 @@
 "use client"
-
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback, useRef} from "react"
 import { Client } from "@stomp/stompjs"
 import { fetchProfile } from "@/lib/profile"
 export interface Message {
@@ -24,8 +23,9 @@ export interface ChatRoom {
 }
 
 // 백엔드 서버 주소
-const BASE_URL=process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
-const WS_URL = BASE_URL.replace("http://", "ws://")
+const BASE_URL=process.env.NEXT_PUBLIC_API_URL!
+
+const WS_URL = BASE_URL.replace("https://", "wss://")
 // 상대방 정보 가져오기 유틸리티 함수
 const getOpponentInfo = (room: ChatRoom, myUserId: string) => {
   if (room.chatUsr1Id === myUserId) {
